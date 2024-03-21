@@ -1,3 +1,4 @@
+#pragma warning (disable:4819)
 #include "flutter_window.h"
 
 #include <flutter/event_channel.h>
@@ -49,7 +50,7 @@ bool FlutterWindow::OnCreate() {
             std::string some_string = std::get<std::string>(v1);
             std::cout << some_string << std::endl;
           }else{
-            std::cout << "warning key1 类型不匹配" << std::endl;
+            std::cout << "key1 type error" << std::endl;
           }
 
           flutter::EncodableValue ev2 = arguments.find(flutter::EncodableValue("key2"))->second;
@@ -57,7 +58,7 @@ bool FlutterWindow::OnCreate() {
             int value2 = std::get<int>(ev2);
             std::cout << value2 << std::endl;
           }else{
-            std::cout << "warning key2 类型不匹配" << std::endl;
+            std::cout << "key2 type error" << std::endl;
           }
 
           flutter::EncodableValue ev3 = arguments.find(flutter::EncodableValue("key3"))->second;
@@ -65,21 +66,8 @@ bool FlutterWindow::OnCreate() {
             int value3 = std::get<bool>(ev3);
             std::cout << value3 << std::endl;
           }else{
-            std::cout << "warning key3 类型不匹配" << std::endl;
+            std::cout << "key3 type error" << std::endl;
           }
-          // const void *arguments = call.arguments();
-          // int counter = std::get<int32_t>((*call.arguments()).find(flutter::EncodableValue("key2"))->second);
-          // auto* v1 = get_if<string>(&(arguments->find(flutter::EncodableValue("key1"))->second));
-          // auto* v2 = get_if<int>(&(arguments->find(flutter::EncodableValue("key2"))->second));
-
-          // std::cout << "value1 =" << v1 << std::endl;
-          // std::cout << "value2 =" << v2 << std::endl;
-          // auto key1_it = arguments->find("key1");
-          // if (key1_it != arguments->end())
-          // {
-          //   auto value1 = std::get<std::string>(key1_it->second);
-          //   std::cout << "value1 =" << value1 << std::endl;
-          // }
           result->Success(true);
           // result->Error("Error", "Music already stoped!");
         } else {
