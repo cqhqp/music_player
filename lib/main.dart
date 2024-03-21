@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 void main() {
   runApp(const MainApp());
@@ -58,7 +59,23 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
     '周杰伦-漂移28.mp3',
     '周杰伦-漂移29.mp3',
     '周杰伦-漂移30.mp3',
-  ]; // 假设音频文件名为 SongX.mp3
+  ]; 
+
+  Map<String, dynamic> arguments = {  
+    'key1': 'value1',  
+    'key2': 123,  
+    'key3': true,  
+  };  
+  static const MethodChannel methodChannel = MethodChannel('flutter_windows_cpp_plugin'); // 通道名
+
+  Future<void> _StopMethod() async {
+    try {
+      final bool result = await methodChannel.invokeMethod("yourMethodName",arguments); // 方法名
+      print("call _StopMethod result=$result.");
+    } on PlatformException catch (e) {
+      print("call _StopMethod Error!");
+    }
+  }
 
   @override
   void initState() {
@@ -78,7 +95,9 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
   }
 
   void _stop() async {
-    setState(() {});
+    setState(() {
+      _StopMethod();
+    });
   }
 
   Widget _buildInfo() {
