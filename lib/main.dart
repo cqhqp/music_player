@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-
-
+import 'package:flutter/widgets.dart';
 void main() {
   runApp(MyApp());
 }
@@ -31,7 +30,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
         children: [
           Container(
             width: 200,
-            child: MenuList(menu: menu),
+            child: MenuList(),
           ),
           Expanded(
             flex: 2,
@@ -64,11 +63,6 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
   int _currentIndex = 0; // 当前播放歌曲的索引
   double _volume = 0.5;
   double _progress = 0.0;
-  final List<String> menu = [
-    'tabs1',
-    'tabs2',
-    'tabs3',
-  ]; // 假设音频文件名为 SongX.mp3
   List<String> playList = [
     'song1',
     'song2',
@@ -76,6 +70,14 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
   ];  
     
   final albumRepository = AlbumRepository([
+    Album("Album 1", "Song 1", "Artist 1"),
+    Album("Album 2", "Song 2", "Artist 2"),
+    Album("Album 3", "Song 3", "Artist 3"),
+    Album("Album 4", "Song 4", "Artist 4"),
+    Album("Album 5", "Song 5", "Artist 5"),
+    Album("Album 6", "Song 6", "Artist 6"),
+    Album("Album 7", "Song 7", "Artist 7"),
+    Album("Album 8", "Song 8", "Artist 8"),
     Album("Album 1", "Song 1", "Artist 1"),
     Album("Album 2", "Song 2", "Artist 2"),
     Album("Album 3", "Song 3", "Artist 3"),
@@ -152,7 +154,7 @@ class TopMenuBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Color.fromARGB(255, 226, 226, 226), // Placeholder color
+      color: Color.fromARGB(255, 245, 245, 245),
       height: 53, // 设置TopMenuBar的高度为60像素
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center, // 让所有子部件在水平方向居中对齐
@@ -267,7 +269,7 @@ class VolumeControls extends StatelessWidget {
       child: Container(
         width: 200, // 设置容器的固定宽度
         height: 60, // 设置容器的固定高度
-      color: Color.fromARGB(255, 226, 226, 226), // Placeholder color
+      color: Color.fromARGB(255, 245, 245, 245), // Placeholder color
         child: Row(
           mainAxisSize: MainAxisSize.min, // 让 Row 尽可能紧凑地包裹其子部件
           mainAxisAlignment: MainAxisAlignment.center, // 让子部件在水平方向居中对齐
@@ -310,7 +312,7 @@ class VolumeControls extends StatelessWidget {
               // width: 30, // 调整按钮之间的间距
               height: double.infinity, // 使 Slider 填充 Container 的整个高度
               child: Transform.scale(
-                scale: 1, // 减小按钮的大小
+                scale: 0.8, // 减小按钮的大小
                 child: IconButton(
                   icon: const Icon(Icons.volume_up, size: 20),
                   onPressed: () {},
@@ -397,33 +399,37 @@ class AlbumGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.builder(
-      padding: EdgeInsets.all(33.0),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4, // 每行显示4个专辑
-        crossAxisSpacing: 6.0,
-        mainAxisSpacing: 26.0,
-        childAspectRatio: 1.0, // 专辑卡片保持正方形
-      ),
-      itemCount: albumRepository.albums.length,
-      itemBuilder: (context, index) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            AlbumCard(album: albumRepository.albums[index]), // 专辑卡片
-            Spacer(),
-            // SizedBox(height: 0),
-            Text(
-              'Title ${index + 1}', // 标题
-              style: TextStyle(fontSize: 13),
-            ),
-          ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        int crossAxisCount = constraints.maxWidth > 1200 ? 5 : 4; // 根据窗口大小决定每行显示的专辑数量
+        return GridView.builder(
+          padding: EdgeInsets.all(33.0),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: 6.0,
+            mainAxisSpacing: 26.0,
+            childAspectRatio: 1.0, // 专辑卡片保持正方形
+          ),
+          itemCount: albumRepository.albums.length,
+          itemBuilder: (context, index) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                AlbumCard(album: albumRepository.albums[index]), // 专辑卡片
+                Spacer(),
+                // SizedBox(height: 0),
+                Text(
+                  'Title ${index + 1}', // 标题
+                  style: TextStyle(fontSize: 13),
+                ),
+              ],
+            );
+          },
         );
       },
     );
   }
 }
-
 
 
 
@@ -493,7 +499,7 @@ class MusicState extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         SongInfo(),
-        SizedBox(height: 13.5),
+        SizedBox(height: 13),
         CustomSlider(),
       ],
     );
@@ -556,7 +562,7 @@ class _CustomSliderState extends State<CustomSlider> {
   Widget build(BuildContext context) {
     return SliderTheme(
       data: SliderTheme.of(context).copyWith(
-        trackHeight: 1.5,
+        trackHeight: 1,
         thumbShape: RoundSliderThumbShape(enabledThumbRadius: 0.0),
         overlayShape: RoundSliderOverlayShape(overlayRadius: 0.0),
       ),
@@ -576,12 +582,7 @@ class _CustomSliderState extends State<CustomSlider> {
 
 
 // Menu List
-
 class MenuList extends StatefulWidget {
-  final List<String> menu;
-
-  const MenuList({Key? key, required this.menu}) : super(key: key);
-
   @override
   _MenuListState createState() => _MenuListState();
 }
@@ -589,50 +590,164 @@ class MenuList extends StatefulWidget {
 class _MenuListState extends State<MenuList> {
   int _selectedIndex = -1; // 初始未选中
 
+  final List<String> menu = [
+    'Recently Played',
+    'Artists',
+    'Albums',
+    'Songs',
+  ];
+
+  final List<String> playList = [
+    'playlist1',
+    'playlist2',
+    'playlist3',
+    'playlist4',
+    'playlist5',
+  ];
+
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8.0), // 添加圆角
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.withOpacity(0.5)), // 添加边框
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(8.0),
+    return Padding(
+      padding: EdgeInsets.only(left: 8.0, right: 8.0), // 仅设置左右内边距
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(height: 66.0), // 添加垂直间距，空白区域
+          Container(
+            height: 30, // 设置Container的高度来控制TextField的高度
+            padding: EdgeInsets.symmetric(horizontal: 0.0), // 调整水平内边距
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(6.0), // 添加圆角
+              border: Border.all(color: Colors.grey.withOpacity(0.5)), // 添加边框
+            ),
+            child: Center( // 让内容居中对齐
               child: TextField(
+                style: TextStyle(fontSize: 11.0), // 调整字体大小
+                // textAlignVertical: TextAlignVertical.center, // 将文本内容垂直居中对齐
                 decoration: InputDecoration(
                   hintText: 'Search',
+                  border: InputBorder.none, // 移除 TextField 的边框
+                  prefixIcon: Icon(Icons.search, size: 17.0), // 添加搜索图标并调整大小
+                  prefixIconConstraints: BoxConstraints(minWidth: 40.0, minHeight: 40.0), // 调整图标位置和大小
+                  contentPadding: EdgeInsets.symmetric(vertical: 0.0), // 垂直方向上不添加内边距
                 ),
               ),
             ),
-            Expanded(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: widget.menu.length,
-                itemBuilder: (context, index) {
-                  return InkWell(
-                    onTap: () {
-                      setState(() {
-                        _selectedIndex = index; // 更新选中索引
-                      });
-                      // 这里添加处理菜单项点击的逻辑
-                    },
-                    child: Container(
-                      color: _selectedIndex == index ? Colors.grey.withOpacity(0.5) : null,
-                      child: ListTile(
-                        title: Text(widget.menu[index]),
-                      ),
-                    ),
-                  );
-                },
+          ),
+          SizedBox(height: 10.0), // 添加垂直间距，减小为原来的一半
+          Row(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                child: Text(
+                  'Menu',
+                  style: TextStyle(fontSize: 12.0, color: Colors.grey, fontWeight: FontWeight.bold),
+                ),
               ),
+            ],
+          ),
+          SizedBox(height: 2.0), // 添加垂直间距，减小为原来的一半
+          Container(
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: menu.length + playList.length + 1, // Add 1 for the divider
+              separatorBuilder: (context, index) => SizedBox(height: 5.0), // Add separator height
+              itemBuilder: (context, index) {
+                if (index < menu.length) {
+                  return buildListItem(index, menu[index]);
+                } else if (index == menu.length) {
+return Padding(
+  padding: const EdgeInsets.symmetric(horizontal: 12.0),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      SizedBox(height: 20), // 添加间距
+      Text(
+        'Playlists',
+        style: TextStyle(fontSize: 12.0, color: Colors.grey, fontWeight: FontWeight.bold),
+      ),
+      // SizedBox(height: 3), // 添加间距
+    ],
+  ),
+);
+
+
+                } else {
+                  return buildListItem(index - 1, playList[index - menu.length - 1]);
+                }
+              },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
+  }
+
+Widget buildListItem(int index, String text) {
+  return Padding(
+    padding: EdgeInsets.symmetric(vertical: 0.0), // 调整垂直内边距，减小为原来的一半
+    child: InkWell(
+      onTap: () {
+        setState(() {
+          _selectedIndex = index; // 更新选中索引
+        });
+        // 这里添加处理菜单项点击的逻辑
+      },
+      child: Stack(
+        children: [
+          Container(  
+  constraints: BoxConstraints(
+    minHeight: 25, // 最小高度为 30
+    maxHeight: 25, // 最大高度为 30
+  ),
+            height: 30,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(6.0), // 将 Container 形状设置为圆形
+            ),
+            child: Row(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 0, 4, 0),
+                  child: getIconForMenu(text), // 根据菜单项获取对应的图标
+                ),
+                Text(
+                  text,
+                  style: TextStyle(fontSize: 12.0), // 调整字体大小
+                ),
+              ],
+            ),
+          ),
+          if (_selectedIndex == index) // 如果选中，则添加选中背景
+            Positioned.fill(
+              child: Container(
+                height: 30, // 背景框的高度
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.5), // 灰色底色
+                  borderRadius: BorderRadius.circular(6.0), // 将 Container 形状设置为圆形
+                ),
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
+}
+
+
+  // 根据菜单项获取对应的图标
+  Icon getIconForMenu(String menuItem) {
+    double iconSize = 17.0; // 设置图标大小
+    switch (menuItem) {
+      case 'Recently Played':
+        return Icon(Icons.history, size: iconSize); // Adjust the size here
+      case 'Artists':
+        return Icon(Icons.account_circle, size: iconSize); // Adjust the size here
+      case 'Albums':
+        return Icon(Icons.album, size: iconSize); // Adjust the size here
+      case 'Songs':
+        return Icon(Icons.library_music, size: iconSize); // Adjust the size here
+      default:
+        return Icon(Icons.adjust, size: iconSize); // Adjust the size here
+    }
   }
 }
