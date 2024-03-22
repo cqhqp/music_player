@@ -140,8 +140,10 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
                       _showPlayList(context);
                     },
                   ),
-                  Expanded(
-                    child: Container(),
+                  Expanded( // Main Window
+                    // child: RepositoryPage(),
+                    child: AlbumRepositoryPage(),
+                    // child: AlbumRepositoryWidget(albumRepository: albumRepository),
                   ),
                 ],
               ),
@@ -165,6 +167,7 @@ class TopMenuBar extends StatelessWidget {
       child: Row(
         children: [
           PlaybackControls(),
+          MusicInfoCard(),
           VolumeControls(), // Add VolumeControls here
           Spacer(),
           IconButton(
@@ -224,6 +227,250 @@ class VolumeControls extends StatelessWidget {
           },
         ),
       ],
+    );
+  }
+}
+class Album {
+  final String name;
+
+  Album(this.name);
+}
+
+class AlbumRepository {
+  List<Album> albums;
+
+  AlbumRepository(this.albums);
+
+  void addAlbum(Album album) {
+    albums.add(album);
+  }
+}
+
+class AlbumWidget extends StatelessWidget {
+  final Album album;
+
+  const AlbumWidget({Key? key, required this.album}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.photo_album, size: 40), // Add an icon for album
+            SizedBox(height: 8), // Add spacing
+            Text(
+              album.name,
+              style: TextStyle(fontSize: 12), // Reduce text size
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AlbumRepositoryWidget extends StatelessWidget {
+  final AlbumRepository albumRepository;
+
+  const AlbumRepositoryWidget({Key? key, required this.albumRepository})
+      : super(key: key);
+
+  @override
+Widget build(BuildContext context) {
+  return CustomScrollView(
+    slivers: <Widget>[
+      SliverToBoxAdapter(
+        child: Container(
+            height: 56, // 调整标题空间的高度
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 20.0), // 添加左边距
+              child: Text(
+                'Respitory',
+                style: Theme.of(context).textTheme.headline6,
+                textAlign: TextAlign.left,
+              ),
+            ),
+          ),
+      ),
+      SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        sliver: SliverGrid(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 4,
+            crossAxisSpacing: 6.0,
+            mainAxisSpacing: 8.0,
+          ),
+          delegate: SliverChildBuilderDelegate(
+            (BuildContext context, int index) {
+              return AlbumWidget(album: albumRepository.albums[index]);
+            },
+            childCount: albumRepository.albums.length,
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+}
+
+class AlbumRepositoryPage extends StatefulWidget {
+  @override
+  _AlbumRepositoryPageState createState() => _AlbumRepositoryPageState();
+}
+
+class _AlbumRepositoryPageState extends State<AlbumRepositoryPage> {
+  final AlbumRepository albumRepository = AlbumRepository([
+    Album("Album 1"),
+    Album("Album 2"),
+    Album("Album 3"),
+    Album("Album 4"),
+    Album("Album 5"),
+    Album("Album 6"),
+    Album("Album 7"),
+    Album("Album 8"),
+  ]);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: AlbumRepositoryWidget(albumRepository: albumRepository),
+    );
+  }
+}
+
+// music info card
+class MusicInfoCard extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(2.0),
+      ),
+      child: Container(
+        width: 250.0,
+        height: 42.5,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            ClipRect(
+              child: AlbumPicture(),
+            ),
+            SizedBox(width: 2.0),
+            Expanded(
+              child: MusicState(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AlbumPicture extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 42.5,
+      height: 42.5,
+      decoration: BoxDecoration(
+        color: Colors.grey,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(2.0),
+          bottomLeft: Radius.circular(2.0),
+        ),
+      ),
+    );
+  }
+}
+
+class MusicState extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SongInfo(),
+        SizedBox(height: 13.5),
+        CustomSlider(),
+      ],
+    );
+  }
+}
+
+class SongInfo extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Padding(
+          padding: EdgeInsets.only(top: 0.0, bottom: 0.5),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
+                  'Song Title',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12.4),
+                ),
+              ),
+              IconButton(
+                onPressed: () {
+                  // Add your like functionality here
+                },
+                icon: Transform.scale(
+                  scale: 1.6,
+                  child: Icon(Icons.star_border, size: 10.0),
+                ),
+                constraints: BoxConstraints(minWidth: 0, minHeight: 0),
+              )
+            ],
+          ),
+        ),
+        Padding(
+          padding: EdgeInsets.only(top: 0.0, bottom: 0.0),
+          child: Text(
+            'Singer - Album Name',
+            style: TextStyle(fontSize: 11.5, color: Colors.grey, height: 0.1),
+          ),
+        )
+      ],
+    );
+  }
+}
+
+class CustomSlider extends StatefulWidget {
+  @override
+  _CustomSliderState createState() => _CustomSliderState();
+}
+
+class _CustomSliderState extends State<CustomSlider> {
+  double _value = 0.5;
+
+  @override
+  Widget build(BuildContext context) {
+    return SliderTheme(
+      data: SliderTheme.of(context).copyWith(
+        trackHeight: 1.5,
+        thumbShape: RoundSliderThumbShape(enabledThumbRadius: 0.0),
+        overlayShape: RoundSliderOverlayShape(overlayRadius: 0.0),
+      ),
+      child: Slider(
+        value: _value,
+        onChanged: (double value) {
+          setState(() {
+            _value = value;
+          });
+          // Add functionality to change progress here
+        },
+      ),
     );
   }
 }
