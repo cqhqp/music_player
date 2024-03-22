@@ -23,6 +23,7 @@ class AudioPlayerScreen extends StatefulWidget {
 }
 
 class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
+  
   bool _isPlaying = false;
   int _currentIndex = 0; // 当前播放歌曲的索引
   double _volume = 0.5;
@@ -100,7 +101,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
       body: Row(
         children: [
           Container(
-            width: MediaQuery.of(context).size.width * 0.25, // 设置宽度为屏幕宽度的25%
+            width: 200,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -164,12 +165,23 @@ class TopMenuBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: Colors.blue, // Placeholder color
+      height: 53, // 设置TopMenuBar的高度为60像素
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.center, // 让所有子部件在水平方向居中对齐
+        mainAxisSize: MainAxisSize.max, // 让Row尽可能占据水平空间
         children: [
-          PlaybackControls(),
-          MusicInfoCard(),
-          VolumeControls(), // Add VolumeControls here
-          Spacer(),
+          Expanded(
+            flex: 2,
+            child: PlaybackControls(),
+          ),
+          Expanded(
+            flex: 3,
+            child: MusicInfoCard(),
+          ),
+          Expanded(
+            flex: 2,
+            child: VolumeControls(),
+          ),
           IconButton(
             icon: Icon(Icons.queue_music),
             onPressed: onPlaylistPressed,
@@ -180,6 +192,7 @@ class TopMenuBar extends StatelessWidget {
   }
 }
 
+
 class PlaybackControls extends StatelessWidget {
   void _playPause() {
     // Play/pause logic
@@ -187,49 +200,148 @@ class PlaybackControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        IconButton(
-          icon: Icon(Icons.shuffle),
-          onPressed: () {},
+    double button_icon_size = 19;
+    double transform_scale = 1.2;
+    double icon_width = 0;
+
+    return Center( // 使用Center居中
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width, // 设置最大宽度
         ),
-        IconButton(
-          icon: Icon(Icons.skip_previous),
-          onPressed: () {},
+        child: IntrinsicWidth(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center, // 水平方向居中
+            children: [
+              Transform.scale(
+                scale: transform_scale,
+                child: IconButton(
+                  icon: Icon(Icons.shuffle),
+                  iconSize: button_icon_size,
+                  onPressed: () {},
+                  constraints: BoxConstraints(minWidth: 0, minHeight: 0),
+                ),
+              ),
+              SizedBox(width: icon_width),
+              Transform.scale(
+                scale: transform_scale,
+                child: IconButton(
+                  icon: Icon(Icons.skip_previous),
+                  iconSize: button_icon_size,
+                  onPressed: () {},
+                  constraints: BoxConstraints(minWidth: 0, minHeight: 0),
+                ),
+              ),
+              SizedBox(width: icon_width),
+              Transform.scale(
+                scale: transform_scale,
+                child: IconButton(
+                  icon: Icon(Icons.pause), // Assuming initial state is paused
+                  iconSize: button_icon_size,
+                  onPressed: _playPause,
+                  constraints: BoxConstraints(minWidth: 0, minHeight: 0),
+                ),
+              ),
+              SizedBox(width: icon_width),
+              Transform.scale(
+                scale: transform_scale,
+                child: IconButton(
+                  icon: Icon(Icons.skip_next),
+                  iconSize: button_icon_size,
+                  onPressed: () {},
+                  constraints: BoxConstraints(minWidth: 0, minHeight: 0),
+                ),
+              ),
+              SizedBox(width: icon_width),
+              Transform.scale(
+                scale: transform_scale,
+                child: IconButton(
+                  icon: Icon(Icons.repeat),
+                  iconSize: button_icon_size,
+                  onPressed: () {},
+                  constraints: BoxConstraints(minWidth: 0, minHeight: 0),
+                ),
+              ),
+            ],
+          ),
         ),
-        IconButton(
-          icon: Icon(Icons.pause), // Assuming initial state is paused
-          onPressed: _playPause,
-        ),
-        IconButton(
-          icon: Icon(Icons.skip_next),
-          onPressed: () {},
-        ),
-        IconButton(
-          icon: Icon(Icons.repeat),
-          onPressed: () {},
-        ),
-      ],
+      ),
     );
   }
 }
 
+
+
 class VolumeControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Slider(
-          value: 0.5, // Placeholder value, replace with _volume
-          onChanged: (double value) {
-            // Adjust volume based on value
-          },
+    return Center(
+      // flex: 1,
+      child: Container(
+        width: 200, // 设置容器的固定宽度
+        height: 60, // 设置容器的固定高度
+        color: Colors.blue, // Placeholder color
+        child: Row(
+          mainAxisSize: MainAxisSize.min, // 让 Row 尽可能紧凑地包裹其子部件
+          mainAxisAlignment: MainAxisAlignment.center, // 让子部件在水平方向居中对齐
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            SizedBox(
+              // width: 30, // 调整按钮之间的间距
+              height: double.infinity, // 使 Slider 填充 Container 的整个高度
+              child: Transform.scale(
+                scale: 0.8, // 减小按钮的大小
+                child: IconButton(
+                  icon: const Icon(Icons.volume_down, size: 20),
+                  onPressed: () {},
+                ),
+              ),
+            ),
+            
+            SizedBox(
+              width: 100, // 设置 Slider 的宽度为 100
+              height: 60, // 使 Slider 和容器一样高
+              child: SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  trackHeight: 2, // 设置轨道的高度
+                  // trackShape: RectangularSliderTrackShape(), // 设置轨道形状为矩形
+                  thumbShape: RoundSliderThumbShape(enabledThumbRadius: 6.0), // 设置滑块形状为圆形
+                  overlayShape: RoundSliderOverlayShape(overlayRadius: 0.0), // 设置覆盖形状为圆形
+                ),
+                child: Slider(
+                  value: 0.5,
+                  onChanged: (double value) {
+                    // 根据值调整音量
+                  },
+                ),
+              ),
+            ),
+
+
+
+            SizedBox(
+              // width: 30, // 调整按钮之间的间距
+              height: double.infinity, // 使 Slider 填充 Container 的整个高度
+              child: Transform.scale(
+                scale: 0.8, // 减小按钮的大小
+                child: IconButton(
+                  icon: const Icon(Icons.volume_up, size: 20),
+                  onPressed: () {},
+                ),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
+
+
+
+
+
+
 class Album {
   final String name;
 
@@ -349,10 +461,10 @@ class MusicInfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(2.0),
+        borderRadius: BorderRadius.circular(3.0),
       ),
       child: Container(
-        width: 250.0,
+        width: 300.0,
         height: 42.5,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -360,7 +472,7 @@ class MusicInfoCard extends StatelessWidget {
             ClipRect(
               child: AlbumPicture(),
             ),
-            SizedBox(width: 2.0),
+            SizedBox(width: 3.0),
             Expanded(
               child: MusicState(),
             ),
@@ -380,8 +492,8 @@ class AlbumPicture extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.grey,
         borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(2.0),
-          bottomLeft: Radius.circular(2.0),
+          topLeft: Radius.circular(3.0),
+          bottomLeft: Radius.circular(3.0),
         ),
       ),
     );
