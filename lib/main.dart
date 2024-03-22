@@ -11,7 +11,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Flutter Menu Demo',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        // primarySwatch: Colors.red,
       ),
       home: AudioPlayerScreen(),
     );
@@ -31,38 +31,12 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
         children: [
           Container(
             width: 200,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Search',
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: menu.length,
-                    itemBuilder: (context, index) {
-                      return ListTile(
-                        title: Text(menu[index]),
-                        onTap: () {
-                          // Handle menu item tap
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
+            child: MenuList(menu: menu),
           ),
           Expanded(
             flex: 2,
             child: Container(
-              color: Colors.grey[200], // Placeholder color
+              color: Color.fromARGB(255, 255, 255, 255), // Placeholder color
               child: Column(
                 children: [
                   TopMenuBar(
@@ -72,7 +46,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
                   ),
                   Expanded( // Main Window
                     // child: RepositoryPage(),
-                    child: AlbumRepositoryPage(),
+                    child: AlbumGrid(albumRepository: albumRepository),
                     // child: AlbumRepositoryWidget(albumRepository: albumRepository),
                   ),
                 ],
@@ -99,7 +73,19 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
     'song1',
     'song2',
     'song3',
-  ];
+  ];  
+    
+  final albumRepository = AlbumRepository([
+    Album("Album 1", "Song 1", "Artist 1"),
+    Album("Album 2", "Song 2", "Artist 2"),
+    Album("Album 3", "Song 3", "Artist 3"),
+    Album("Album 4", "Song 4", "Artist 4"),
+    Album("Album 5", "Song 5", "Artist 5"),
+    Album("Album 6", "Song 6", "Artist 6"),
+    Album("Album 7", "Song 7", "Artist 7"),
+    Album("Album 8", "Song 8", "Artist 8"),
+    // 添加更多专辑
+  ]);
 
   void _showPlayList(BuildContext context) {
     showGeneralDialog(
@@ -166,7 +152,7 @@ class TopMenuBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.blue, // Placeholder color
+      color: Color.fromARGB(255, 226, 226, 226), // Placeholder color
       height: 53, // 设置TopMenuBar的高度为60像素
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center, // 让所有子部件在水平方向居中对齐
@@ -281,7 +267,7 @@ class VolumeControls extends StatelessWidget {
       child: Container(
         width: 200, // 设置容器的固定宽度
         height: 60, // 设置容器的固定高度
-        color: Colors.blue, // Placeholder color
+      color: Color.fromARGB(255, 226, 226, 226), // Placeholder color
         child: Row(
           mainAxisSize: MainAxisSize.min, // 让 Row 尽可能紧凑地包裹其子部件
           mainAxisAlignment: MainAxisAlignment.center, // 让子部件在水平方向居中对齐
@@ -324,7 +310,7 @@ class VolumeControls extends StatelessWidget {
               // width: 30, // 调整按钮之间的间距
               height: double.infinity, // 使 Slider 填充 Container 的整个高度
               child: Transform.scale(
-                scale: 0.8, // 减小按钮的大小
+                scale: 1, // 减小按钮的大小
                 child: IconButton(
                   icon: const Icon(Icons.volume_up, size: 20),
                   onPressed: () {},
@@ -338,19 +324,23 @@ class VolumeControls extends StatelessWidget {
   }
 }
 
+// Album
 
 
 
 
 
+
+// Album 类
 class Album {
   final String name;
-  final String song; // 添加歌曲名字段
-  final String artist; // 添加专辑名字段
+  final String song;
+  final String artist;
 
   Album(this.name, this.song, this.artist);
 }
 
+// 专辑仓库类
 class AlbumRepository {
   List<Album> albums;
 
@@ -361,55 +351,36 @@ class AlbumRepository {
   }
 }
 
-class AlbumWidget extends StatelessWidget {
+// 专辑卡片组件
+class AlbumCard extends StatelessWidget {
   final Album album;
+  final double scaleFactor;
 
-  const AlbumWidget({Key? key, required this.album}) : super(key: key);
+  const AlbumCard({Key? key, required this.album, this.scaleFactor = 1.2}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: IntrinsicHeight(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            AspectRatio(
-              aspectRatio: 1,
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        album.name,
-                        style: TextStyle(fontSize: 12),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        album.song,
-                        style: TextStyle(fontSize: 10),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        album.artist,
-                        style: TextStyle(fontSize: 10),
-                      ),
-                    ],
-                  ),
+    return Transform.scale(
+      scale: scaleFactor,
+      child: Container(
+        clipBehavior: Clip.none, // 告诉 Flutter 不要剪裁溢出的部分
+        child: FractionallySizedBox(
+          widthFactor: 0.8, // 设置 Card 宽度为 AlbumCard 宽度的 80%
+          child: Card(
+            child: Container(
+              child: AspectRatio(
+                aspectRatio: 1.0, // 设置宽高比为1:1，保持正方形
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.album, size: 70), // 专辑图标
+                    SizedBox(height: 8),
+                    Text(album.name), // 专辑名称
+                  ],
                 ),
               ),
             ),
-            // SizedBox(height: 4), // Add spacing between Card and text
-            // Padding(
-            //   padding: const EdgeInsets.symmetric(horizontal: 8.0,),
-            //   child: Text(
-            //     'Additional Text', // Add your additional text here
-            //     style: TextStyle(fontSize: 10, color: Colors.grey, height:2),
-            //   ),
-            // ),
-          ],
+          ),
         ),
       ),
     );
@@ -418,86 +389,53 @@ class AlbumWidget extends StatelessWidget {
 
 
 
-
-
-
-
-
-
-class AlbumRepositoryWidget extends StatelessWidget {
+// 专辑网格组件
+class AlbumGrid extends StatelessWidget {
   final AlbumRepository albumRepository;
 
-  const AlbumRepositoryWidget({Key? key, required this.albumRepository})
-      : super(key: key);
+  const AlbumGrid({Key? key, required this.albumRepository}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return CustomScrollView(
-      slivers: <Widget>[
-        SliverToBoxAdapter(
-          child: Container(
-            height: 40,
-            alignment: Alignment.centerLeft,
-            child: Padding(
-              padding: const EdgeInsets.only(left: 28.0),
-              child: Text(
-                'Repository',
-                style: Theme.of(context).textTheme.headline6,
-                textAlign: TextAlign.left,
-              ),
+    return GridView.builder(
+      padding: EdgeInsets.all(33.0),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 4, // 每行显示4个专辑
+        crossAxisSpacing: 6.0,
+        mainAxisSpacing: 26.0,
+        childAspectRatio: 1.0, // 专辑卡片保持正方形
+      ),
+      itemCount: albumRepository.albums.length,
+      itemBuilder: (context, index) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            AlbumCard(album: albumRepository.albums[index]), // 专辑卡片
+            Spacer(),
+            // SizedBox(height: 0),
+            Text(
+              'Title ${index + 1}', // 标题
+              style: TextStyle(fontSize: 13),
             ),
-          ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 36.0, vertical: 16.0),
-          sliver: SliverGrid(
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4,
-              crossAxisSpacing: 16.0,
-              mainAxisSpacing: 38.0,
-            ),
-            delegate: SliverChildBuilderDelegate(
-              (BuildContext context, int index) {
-                return AlbumWidget(album: albumRepository.albums[index]);
-              },
-              childCount: albumRepository.albums.length,
-            ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 }
 
 
-class AlbumRepositoryPage extends StatefulWidget {
-  @override
-  _AlbumRepositoryPageState createState() => _AlbumRepositoryPageState();
-}
 
-class _AlbumRepositoryPageState extends State<AlbumRepositoryPage> {
-  final AlbumRepository albumRepository = AlbumRepository([
-    Album("Album 1", "Song 1", "Artist 1"),
-    Album("Album 2", "Song 2", "Artist 2"),
-    // Album("Album 3", "Song 3", "Artist 3"),
-    // Album("Album 3", "Song 3", "Artist 3"),
-    // Album("Album 3", "Song 3", "Artist 3"),
-    // Album("Album 3", "Song 3", "Artist 3"),
-    // Album("Album 3", "Song 3", "Artist 3"),
-    // Album("Album 3", "Song 3", "Artist 3"),
-    // Album("Album 3", "Song 3", "Artist 3"),
-    // Album("Album 3", "Song 3", "Artist 3"),
-    // Album("Album 3", "Song 3", "Artist 3"),
-    // 添加其他专辑的信息
-  ]);
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: AlbumRepositoryWidget(albumRepository: albumRepository),
-    );
-  }
-}
+
+
+
+
+
+
+
+
+
 
 
 
@@ -630,6 +568,70 @@ class _CustomSliderState extends State<CustomSlider> {
           });
           // Add functionality to change progress here
         },
+      ),
+    );
+  }
+}
+
+
+
+// Menu List
+
+class MenuList extends StatefulWidget {
+  final List<String> menu;
+
+  const MenuList({Key? key, required this.menu}) : super(key: key);
+
+  @override
+  _MenuListState createState() => _MenuListState();
+}
+
+class _MenuListState extends State<MenuList> {
+  int _selectedIndex = -1; // 初始未选中
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8.0), // 添加圆角
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.withOpacity(0.5)), // 添加边框
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: TextField(
+                decoration: InputDecoration(
+                  hintText: 'Search',
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: widget.menu.length,
+                itemBuilder: (context, index) {
+                  return InkWell(
+                    onTap: () {
+                      setState(() {
+                        _selectedIndex = index; // 更新选中索引
+                      });
+                      // 这里添加处理菜单项点击的逻辑
+                    },
+                    child: Container(
+                      color: _selectedIndex == index ? Colors.grey.withOpacity(0.5) : null,
+                      child: ListTile(
+                        title: Text(widget.menu[index]),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
