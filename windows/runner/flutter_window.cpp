@@ -15,6 +15,8 @@
 #include "audio_plugin_handle.h"
 // #include "file_plugin_handle.h"
 
+#define WM_MY_CUSTOM_MESSAGE (WM_USER + 1) // 自定义消息，确保不与现有消息冲突  
+
 FlutterWindow::FlutterWindow(const flutter::DartProject &project)
     : project_(project) {}
 
@@ -93,13 +95,16 @@ bool FlutterWindow::OnCreate()
   //       }
   //     });
 
-  int seconds_idx = 0;
+  // auto timer_callback = [](FlutterWindow *flutterW)
+  // {
+  //   std::cout << " seconds_idx: " << flutterW->seconds_idx << std::endl;
+  // };
   flutter::EventChannel<> charging_channel(
       flutter_controller_->engine()->messenger(), "samples.flutter.io/charging",
       &flutter::StandardMethodCodec::GetInstance());
   charging_channel.SetStreamHandler(
       std::make_unique<flutter::StreamHandlerFunctions<>>(
-          [this](auto arguments, auto events)
+          [&](auto arguments, auto events)
           {
             //  int seconds_idx = 0;
             //  auto timer_callback = [&seconds_idx]() {
@@ -118,12 +123,27 @@ bool FlutterWindow::OnCreate()
             //   std::cout << " seconds_idx: " << std::endl;
             // };
             // std::thread timer_thread([&timer_callback]()
-            //                          {  
-            //      while (true) {  
+            //                          {
+            //      while (true) {
             //         timer_callback();
-            //         std::this_thread::sleep_for(std::chrono::seconds(1));  
+            //         std::this_thread::sleep_for(std::chrono::seconds(1));
             //      } });
             // timer_thread.detach();
+            FlutterWindow *fw = this;
+            auto timer_callback = [](FlutterWindow *flutterW)
+            {
+              // std::cout << " seconds_idx: " << flutterW->seconds_idx << std::endl;
+            };
+            std::thread timer_thread([&](FlutterWindow *flutterW) {  
+                 while (true) {  
+                    flutterW->seconds_idx++;
+                    timer_callback(flutterW);
+                    std::this_thread::sleep_for(std::chrono::seconds(1));  
+                    // std::cout << " seconds_idx: " << flutterW->seconds_idx << std::endl;
+                    // SendMessage(flutter_window_hwnd, WM_MY_CUSTOM_MESSAGE, wParamValue, lParamValue);
+                 }
+              }, fw);
+            timer_thread.detach();
 
             this->OnStreamListen(std::move(events));
             return nullptr;
@@ -188,23 +208,22 @@ void FlutterWindow::OnStreamListen(
     std::unique_ptr<flutter::EventSink<>> &&events)
 {
   event_sink_ = std::move(events);
-  SendBatteryStateEvent();
-  power_notification_handle_ =
-      RegisterPowerSettingNotification(GetHandle(), &GUID_ACDC_POWER_SOURCE, 0);
+  SendStateEvent();
 }
 
 void FlutterWindow::OnStreamCancel() { event_sink_ = nullptr; }
 
-void FlutterWindow::SendBatteryStateEvent()
+void FlutterWindow::SendStateEvent()
 {
-  SYSTEM_POWER_STATUS status;
-  if (GetSystemPowerStatus(&status) == 0 || status.ACLineStatus == 255)
-  {
-    event_sink_->Error("UNAVAILABLE", "Charging status unavailable");
-  }
-  else
-  {
-    event_sink_->Success(flutter::EncodableValue(
-        status.ACLineStatus == 1 ? "charging" : "discharging"));
-  }
+  event_sink_->Error("UNAVAILABLE", "Charging status unavailable");
+  // SYSTEM_POWER_STATUS status;
+  // if (GetSystemPowerStatus(&status) == 0 || status.ACLineStatus == 255)
+  // {
+  //   event_sink_->Error("UNAVAILABLE", "Charging status unavailable");
+  // }
+  // else
+  // {
+  //   event_sink_->Success(flutter::EncodableValue(
+  //       status.ACLineStatus == 1 ? "charging" : "discharging"));
+  // }
 }
