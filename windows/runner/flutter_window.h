@@ -23,7 +23,6 @@ class FlutterWindow : public Win32Window {
   LRESULT MessageHandler(HWND window, UINT const message, WPARAM const wparam,
                          LPARAM const lparam) noexcept override;
 
-  int seconds_idx = 0;
  private:
   // The project to run.
   flutter::DartProject project_;
@@ -41,6 +40,10 @@ class FlutterWindow : public Win32Window {
   std::unique_ptr<flutter::EventSink<>> event_sink_;
   HPOWERNOTIFY power_notification_handle_ = nullptr;
 
+  HANDLE semaphore;
+#define MAX_SEMAPHORE_COUNT 5  
+#define INITIAL_SEMAPHORE_COUNT 1  
+  int message_idx = 0;
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

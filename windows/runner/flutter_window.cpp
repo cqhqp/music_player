@@ -29,6 +29,17 @@ bool FlutterWindow::OnCreate()
     return false;
   }
 
+  semaphore = CreateSemaphore(  
+      NULL,                   
+      INITIAL_SEMAPHORE_COUNT,
+      MAX_SEMAPHORE_COUNT,     
+      NULL);                  
+
+  if (semaphore == NULL) {  
+      std::cerr << "Failed to create semaphore!" << std::endl;  
+      return false;
+  }  
+
   RECT frame = GetClientArea();
 
   // The size here must match the window dimensions to avoid unnecessary surface
@@ -106,43 +117,14 @@ bool FlutterWindow::OnCreate()
       std::make_unique<flutter::StreamHandlerFunctions<>>(
           [&](auto arguments, auto events)
           {
-            //  int seconds_idx = 0;
-            //  auto timer_callback = [&seconds_idx]() {
-            //      // SendDataToFlutter(sink);
-            //      std::cout << " seconds_idx: "<< seconds_idx++ << std::endl;
-            //  };
-            //  std::thread timer_thread([&timer_callback]() {
-            //      while (true) {
-            //          timer_callback();
-            //          std::this_thread::sleep_for(std::chrono::seconds(1));
-            //      }
-            //  });
-            // auto timer_callback = []()
-            // {
-            //   // SendDataToFlutter(sink);
-            //   std::cout << " seconds_idx: " << std::endl;
-            // };
-            // std::thread timer_thread([&timer_callback]()
-            //                          {
-            //      while (true) {
-            //         timer_callback();
-            //         std::this_thread::sleep_for(std::chrono::seconds(1));
-            //      } });
-            // timer_thread.detach();
-            FlutterWindow *fw = this;
-            auto timer_callback = [](FlutterWindow *flutterW)
-            {
-              // std::cout << " seconds_idx: " << flutterW->seconds_idx << std::endl;
-            };
-            std::thread timer_thread([&](FlutterWindow *flutterW) {  
+            std::thread timer_thread([&]() {  
                  while (true) {  
-                    flutterW->seconds_idx++;
-                    timer_callback(flutterW);
                     std::this_thread::sleep_for(std::chrono::seconds(1));  
-                    // std::cout << " seconds_idx: " << flutterW->seconds_idx << std::endl;
-                    // SendMessage(flutter_window_hwnd, WM_MY_CUSTOM_MESSAGE, wParamValue, lParamValue);
+                    
+                    WaitForSingleObject(semaphore, INFINITE);  
+                    SendMessage(GetHandle(), WM_MY_CUSTOM_MESSAGE, 0, 0);
                  }
-              }, fw);
+              });
             timer_thread.detach();
 
             this->OnStreamListen(std::move(events));
@@ -199,6 +181,12 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   case WM_FONTCHANGE:
     flutter_controller_->engine()->ReloadSystemFonts();
     break;
+  case WM_MY_CUSTOM_MESSAGE:
+    ReleaseSemaphore(semaphore, 1, NULL);  
+    message_idx++;
+    std::cout << " MessageHandler ... " << message_idx<< std::endl;
+    break;
+    
   }
 
   return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
