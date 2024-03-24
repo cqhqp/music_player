@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import './audio_plugin.dart';
+import './audio_file.dart';
+import 'package:file_picker/file_picker.dart';
 
 void main() {
   runApp(const MainApp());
@@ -28,59 +31,19 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
   int _currentIndex = 0; // 当前播放歌曲的索引
   double _volume = 0.0;
   double _progress = 0.0;
-  final List<String> _songs =  [
-    '周杰伦-漂移1.mp3',
-    '周杰伦-漂移2.mp3',
-    '周杰伦-漂移3.mp3',
-    '周杰伦-漂移4.mp3',
-    '周杰伦-漂移5.mp3',
-    '周杰伦-漂移6.mp3',
-    '周杰伦-漂移7.mp3',
-    '周杰伦-漂移8.mp3',
-    '周杰伦-漂移9.mp3',
-    '周杰伦-漂移10.mp3',
-    '周杰伦-漂移11.mp3',
-    '周杰伦-漂移12.mp3',
-    '周杰伦-漂移13.mp3',
-    '周杰伦-漂移14.mp3',
-    '周杰伦-漂移15.mp3',
-    '周杰伦-漂移16.mp3',
-    '周杰伦-漂移17.mp3',
-    '周杰伦-漂移18.mp3',
-    '周杰伦-漂移19.mp3',
-    '周杰伦-漂移20.mp3',
-    '周杰伦-漂移21.mp3',
-    '周杰伦-漂移22.mp3',
-    '周杰伦-漂移23.mp3',
-    '周杰伦-漂移24.mp3',
-    '周杰伦-漂移25.mp3',
-    '周杰伦-漂移26.mp3',
-    '周杰伦-漂移27.mp3',
-    '周杰伦-漂移28.mp3',
-    '周杰伦-漂移29.mp3',
-    '周杰伦-漂移30.mp3',
-  ]; 
-
-  Map<String, dynamic> arguments = {  
-    'key1': 'value1',  
-    'key2': 123,  
-    'key3': true,  
-  };  
-  static const MethodChannel methodChannel = MethodChannel('flutter_windows_cpp_plugin'); // 通道名
-
-  Future<void> _StopMethod() async {
-    try {
-      final bool result = await methodChannel.invokeMethod("yourMethodName",arguments); // 方法名
-      print("call _StopMethod result=$result.");
-    } on PlatformException catch (e) {
-      print("call _StopMethod Error!");
-    }
-  }
+  List<AudioFile> _songs = [];
+  AudioPlugin _audioPlugin = new AudioPlugin();
+  AudioFile file = new AudioFile("name", "type", 0, null);
+  String _song_name = "NONE";
+  String _song_artist = "NONE";
+  String _song_album = "NONE";
+  static const EventChannel eventChannel = EventChannel('samples.flutter.io/charging');
 
   @override
   void initState() {
     super.initState();
     _isPlaying = false;
+    eventChannel.receiveBroadcastStream().listen(_onEvent, onError: _onError); // 订阅底层事件
   }
 
   @override
@@ -88,32 +51,85 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
     super.dispose();
   }
 
+  void _onEvent(Object? event) {
+    setState(() {
+    });
+  }
+
+  void _onError(Object error) {
+    setState(() {
+    });
+  }
+
+  // 停止
+  void _open() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['mp3', 'MP3'],
+    );
+    if (result != null) {
+      print(result.files.single.name);
+      print(result.files.single.extension);
+      print(result.files.single.size);
+      print(result.files.single.path);
+      file = new AudioFile(
+          result.files.single.name,
+          result.files.single.extension,
+          result.files.single.size,
+          result.files.single.path);
+
+      setState(() {
+        _songs.add(file);
+        _play();
+      });
+    } else {
+      // User canceled the picker
+    }
+  }
+
+  // 播放
+  void _play() async {
+    _isPlaying = true;    
+    Map<String?, String?> out = await _audioPlugin.play(file.path);
+    _song_name = out["title"].toString();
+    _song_artist = out["artist"].toString();
+    _song_album = out["album"].toString();
+  }
+
+  // 播放和暂停
   void _playPause() async {
     setState(() {
       _isPlaying = !_isPlaying;
     });
+    if (_isPlaying) {
+      _play();
+    } else {
+      _audioPlugin.pause();
+    }
   }
 
+  // 停止
   void _stop() async {
     setState(() {
-      _StopMethod();
+      _audioPlugin.stop();
     });
   }
 
+  // 音乐信息
   Widget _buildInfo() {
-    return const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+    return Column(mainAxisAlignment: MainAxisAlignment.center, children: [
       // Image.asset('images/hello.jpeg', width: 200, height: 200),
       Text(
         // 歌曲名
-        '漂移',
+        _song_name,
         style: TextStyle(fontSize: 50),
       ),
 
       SizedBox(height: 10),
       // 其他歌曲信息（如艺术家、专辑等）
       Text(
-        // 歌曲名
-        '周杰伦：头文字D',
+        // 歌曲名        
+        _song_artist+":"+_song_album,
         style: TextStyle(fontSize: 20),
       ),
 
@@ -173,7 +189,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
           IconButton(
             icon: const Icon(Icons.music_video),
             iconSize: 50,
-            onPressed: () {},
+            onPressed: _open,
             tooltip: 'open music',
           ),
           IconButton(
@@ -218,8 +234,9 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
       ),
       onTap: () {
         setState(() {
-          _currentIndex = index;
-          _playPause();
+          _currentIndex = index;  
+          file = _songs[_currentIndex];
+          _play();
         });
       },
     );
@@ -231,7 +248,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
       itemCount: _songs.length,
       itemBuilder: (BuildContext context, int index) {
         return _buildPlaylistItem(
-            _songs[index].substring(0, _songs[index].lastIndexOf('.')), index);
+            _songs[index].filename.substring(0, _songs[index].filename.lastIndexOf('.')), index);
       },
     );
   }
@@ -259,7 +276,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
                       color: Colors.transparent,
                     ),
                   ),
-                  
+
                   _buildInfo(),
 
                   // 占据剩余空间的Expanded widget
@@ -286,7 +303,6 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
                 ],
               ),
             ),
-
             Expanded(
               flex: 3, // 左侧按钮占20%
               child: _buildPlaylist(),

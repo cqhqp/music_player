@@ -11,6 +11,8 @@ add_executable(${BINARY_NAME} WIN32
   "main.cpp"
   "utils.cpp"
   "win32_window.cpp"
+  "${CMAKE_SOURCE_DIR}/module/audio_plugin_handle.cpp"
+  "${CMAKE_SOURCE_DIR}/module/file_plugin_handle.cpp"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
   "Runner.rc"
   "runner.exe.manifest"
@@ -32,9 +34,40 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
 
 # Add dependency libraries and include directories. Add any application-specific
 # dependencies here.
+link_directories("${CMAKE_SOURCE_DIR}/ffmpeg/lib")  
+
+target_link_libraries(${BINARY_NAME} PRIVATE
+  "${CMAKE_SOURCE_DIR}/ffmpeg/lib/avcodec.lib"
+  "${CMAKE_SOURCE_DIR}/ffmpeg/lib/avdevice.lib"
+  "${CMAKE_SOURCE_DIR}/ffmpeg/lib/avfilter.lib"
+  "${CMAKE_SOURCE_DIR}/ffmpeg/lib/avformat.lib"
+  "${CMAKE_SOURCE_DIR}/ffmpeg/lib/avutil.lib"
+  "${CMAKE_SOURCE_DIR}/ffmpeg/lib/postproc.lib"
+  "${CMAKE_SOURCE_DIR}/ffmpeg/lib/swresample.lib"
+  "${CMAKE_SOURCE_DIR}/ffmpeg/lib/swscale.lib"
+)
+
 target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
-target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
+target_include_directories(${BINARY_NAME} PRIVATE 
+  "${CMAKE_SOURCE_DIR}"
+  "${CMAKE_SOURCE_DIR}/module"
+  "${CMAKE_SOURCE_DIR}/ffmpeg/include"
+
+)
+
+# List of absolute paths to libraries that should be bundled with the plugin
+set(flutter_ffmpeg_bundled_libraries
+  "${CMAKE_SOURCE_DIR}/ffmpeg/bin/avcodec-60.dll"
+  "${CMAKE_SOURCE_DIR}/ffmpeg/bin/avdevice-60.dll"
+  "${CMAKE_SOURCE_DIR}/ffmpeg/bin/avfilter-9.dll"
+  "${CMAKE_SOURCE_DIR}/ffmpeg/bin/avformat-60.dll"
+  "${CMAKE_SOURCE_DIR}/ffmpeg/bin/avutil-58.dll"
+  "${CMAKE_SOURCE_DIR}/ffmpeg/lib/postproc-57.dll"
+  "${CMAKE_SOURCE_DIR}/ffmpeg/bin/swresample-4.dll"
+  "${CMAKE_SOURCE_DIR}/ffmpeg/bin/swscale-7.dll"
+  PARENT_SCOPE
+)
 
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)

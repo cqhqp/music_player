@@ -1,4 +1,4 @@
-#pragma warning (disable:4819)
+#pragma warning(disable : 4819)
 #include "flutter_window.h"
 
 #include <flutter/event_channel.h>
@@ -9,16 +9,21 @@
 #include <windows.h>
 #include <memory>
 #include <optional>
+#include <thread>
 
 #include "flutter/generated_plugin_registrant.h"
+#include "audio_plugin_handle.h"
+// #include "file_plugin_handle.h"
 
-FlutterWindow::FlutterWindow(const flutter::DartProject& project)
+FlutterWindow::FlutterWindow(const flutter::DartProject &project)
     : project_(project) {}
 
 FlutterWindow::~FlutterWindow() {}
 
-bool FlutterWindow::OnCreate() {
-  if (!Win32Window::OnCreate()) {
+bool FlutterWindow::OnCreate()
+{
+  if (!Win32Window::OnCreate())
+  {
     return false;
   }
 
@@ -29,57 +34,110 @@ bool FlutterWindow::OnCreate() {
   flutter_controller_ = std::make_unique<flutter::FlutterViewController>(
       frame.right - frame.left, frame.bottom - frame.top, project_);
   // Ensure that basic setup of the controller was successful.
-  if (!flutter_controller_->engine() || !flutter_controller_->view()) {
+  if (!flutter_controller_->engine() || !flutter_controller_->view())
+  {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
-  
+
+  MyAudioPluginHandler handler;
+  // FilePluginHandler file_handler;
   // 注册flutter函数
   flutter::MethodChannel<> channel(
       flutter_controller_->engine()->messenger(), "flutter_windows_cpp_plugin",
       &flutter::StandardMethodCodec::GetInstance());
+
   channel.SetMethodCallHandler(
-      [](const flutter::MethodCall<>& call,
-         std::unique_ptr<flutter::MethodResult<>> result) {
-        if (call.method_name() == "yourMethodName") {
-          std::cout << " ... yourMethodName ...!" << std::endl;
+      [&](const flutter::MethodCall<flutter::EncodableValue> &method_call,
+          std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result)
+      {
+        const flutter::EncodableValue *param = method_call.arguments();
 
-          const flutter::EncodableMap arguments = std::get<flutter::EncodableMap>(*call.arguments());
-          flutter::EncodableValue v1 = arguments.find(flutter::EncodableValue("key1"))->second;
-          if (std::holds_alternative<std::string>(v1)) {
-            std::string some_string = std::get<std::string>(v1);
-            std::cout << some_string << std::endl;
-          }else{
-            std::cout << "key1 type error" << std::endl;
-          }
-
-          flutter::EncodableValue ev2 = arguments.find(flutter::EncodableValue("key2"))->second;
-          if (std::holds_alternative<int>(ev2)) {
-            int value2 = std::get<int>(ev2);
-            std::cout << value2 << std::endl;
-          }else{
-            std::cout << "key2 type error" << std::endl;
-          }
-
-          flutter::EncodableValue ev3 = arguments.find(flutter::EncodableValue("key3"))->second;
-          if (std::holds_alternative<bool>(ev3)) {
-            int value3 = std::get<bool>(ev3);
-            std::cout << value3 << std::endl;
-          }else{
-            std::cout << "key3 type error" << std::endl;
-          }
-          result->Success(true);
-          // result->Error("Error", "Music already stoped!");
-        } else {
+        if (method_call.method_name() == "play")
+        {
+          handler.HandlePlay(param, std::move(result));
+        }
+        else if (method_call.method_name() == "pause")
+        {
+          handler.HandlePause(param, std::move(result));
+        }
+        else if (method_call.method_name() == "stop")
+        {
+          const flutter::EncodableMap arguments = std::get<flutter::EncodableMap>(*param);
+          handler.HandleStop(arguments, std::move(result));
+          // handler.HandlePlay();
+        }
+        else
+        {
           result->NotImplemented();
         }
       });
-  
+
+  // 注册flutter函数
+  // flutter::MethodChannel<> channel2(
+  //     flutter_controller_->engine()->messenger(), "flutter_windows_plugin/file_picker",
+  //     &flutter::StandardMethodCodec::GetInstance());
+
+  // channel2.SetMethodCallHandler(
+  //     [&](const flutter::MethodCall<flutter::EncodableValue> &method_call,
+  //         std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result)
+  //     {
+  //       const flutter::EncodableMap arguments = std::get<flutter::EncodableMap>(*method_call.arguments());
+  //       if (method_call.method_name() == "openFilePicker")
+  //       {
+  //         file_handler.HandleOpen(arguments, std::move(result));
+  //       }
+  //       else
+  //       {
+  //         result->NotImplemented();
+  //       }
+  //     });
+
+  int seconds_idx = 0;
+  flutter::EventChannel<> charging_channel(
+      flutter_controller_->engine()->messenger(), "samples.flutter.io/charging",
+      &flutter::StandardMethodCodec::GetInstance());
+  charging_channel.SetStreamHandler(
+      std::make_unique<flutter::StreamHandlerFunctions<>>(
+          [this](auto arguments, auto events)
+          {
+            //  int seconds_idx = 0;
+            //  auto timer_callback = [&seconds_idx]() {
+            //      // SendDataToFlutter(sink);
+            //      std::cout << " seconds_idx: "<< seconds_idx++ << std::endl;
+            //  };
+            //  std::thread timer_thread([&timer_callback]() {
+            //      while (true) {
+            //          timer_callback();
+            //          std::this_thread::sleep_for(std::chrono::seconds(1));
+            //      }
+            //  });
+            // auto timer_callback = []()
+            // {
+            //   // SendDataToFlutter(sink);
+            //   std::cout << " seconds_idx: " << std::endl;
+            // };
+            // std::thread timer_thread([&timer_callback]()
+            //                          {  
+            //      while (true) {  
+            //         timer_callback();
+            //         std::this_thread::sleep_for(std::chrono::seconds(1));  
+            //      } });
+            // timer_thread.detach();
+
+            this->OnStreamListen(std::move(events));
+            return nullptr;
+          },
+          [this](auto arguments)
+          {
+            this->OnStreamCancel();
+            return nullptr;
+          }));
+
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
-  flutter_controller_->engine()->SetNextFrameCallback([&]() {
-    this->Show();
-  });
+  flutter_controller_->engine()->SetNextFrameCallback([&]()
+                                                      { this->Show(); });
 
   // Flutter can complete the first frame before the "show window" callback is
   // registered. The following call ensures a frame is pending to ensure the
@@ -89,8 +147,10 @@ bool FlutterWindow::OnCreate() {
   return true;
 }
 
-void FlutterWindow::OnDestroy() {
-  if (flutter_controller_) {
+void FlutterWindow::OnDestroy()
+{
+  if (flutter_controller_)
+  {
     flutter_controller_ = nullptr;
   }
 
@@ -100,22 +160,51 @@ void FlutterWindow::OnDestroy() {
 LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
-                              LPARAM const lparam) noexcept {
+                              LPARAM const lparam) noexcept
+{
   // Give Flutter, including plugins, an opportunity to handle window messages.
-  if (flutter_controller_) {
+  if (flutter_controller_)
+  {
     std::optional<LRESULT> result =
         flutter_controller_->HandleTopLevelWindowProc(hwnd, message, wparam,
                                                       lparam);
-    if (result) {
+    if (result)
+    {
       return *result;
     }
   }
 
-  switch (message) {
-    case WM_FONTCHANGE:
-      flutter_controller_->engine()->ReloadSystemFonts();
-      break;
+  switch (message)
+  {
+  case WM_FONTCHANGE:
+    flutter_controller_->engine()->ReloadSystemFonts();
+    break;
   }
 
   return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
+}
+
+void FlutterWindow::OnStreamListen(
+    std::unique_ptr<flutter::EventSink<>> &&events)
+{
+  event_sink_ = std::move(events);
+  SendBatteryStateEvent();
+  power_notification_handle_ =
+      RegisterPowerSettingNotification(GetHandle(), &GUID_ACDC_POWER_SOURCE, 0);
+}
+
+void FlutterWindow::OnStreamCancel() { event_sink_ = nullptr; }
+
+void FlutterWindow::SendBatteryStateEvent()
+{
+  SYSTEM_POWER_STATUS status;
+  if (GetSystemPowerStatus(&status) == 0 || status.ACLineStatus == 255)
+  {
+    event_sink_->Error("UNAVAILABLE", "Charging status unavailable");
+  }
+  else
+  {
+    event_sink_->Success(flutter::EncodableValue(
+        status.ACLineStatus == 1 ? "charging" : "discharging"));
+  }
 }
