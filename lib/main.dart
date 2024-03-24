@@ -52,7 +52,9 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
   }
 
   void _onEvent(Object? event) {
+    String str = event.toString();
     setState(() {
+      print("event:"+str);
     });
   }
 

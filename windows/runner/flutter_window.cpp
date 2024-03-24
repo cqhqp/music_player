@@ -185,6 +185,7 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     ReleaseSemaphore(semaphore, 1, NULL);  
     message_idx++;
     std::cout << " MessageHandler ... " << message_idx<< std::endl;
+    SendStateEvent();
     break;
     
   }
@@ -196,14 +197,14 @@ void FlutterWindow::OnStreamListen(
     std::unique_ptr<flutter::EventSink<>> &&events)
 {
   event_sink_ = std::move(events);
-  SendStateEvent();
+  // SendStateEvent();
 }
 
 void FlutterWindow::OnStreamCancel() { event_sink_ = nullptr; }
 
 void FlutterWindow::SendStateEvent()
 {
-  event_sink_->Error("UNAVAILABLE", "Charging status unavailable");
+  // event_sink_->Error("UNAVAILABLE", "Charging status unavailable");
   // SYSTEM_POWER_STATUS status;
   // if (GetSystemPowerStatus(&status) == 0 || status.ACLineStatus == 255)
   // {
@@ -214,4 +215,5 @@ void FlutterWindow::SendStateEvent()
   //   event_sink_->Success(flutter::EncodableValue(
   //       status.ACLineStatus == 1 ? "charging" : "discharging"));
   // }
+  event_sink_->Success(flutter::EncodableValue(message_idx));
 }
