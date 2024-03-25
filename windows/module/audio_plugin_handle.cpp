@@ -56,6 +56,18 @@ extern "C"
 //   return filesize;
 // }
 
+#include <filesystem>  
+namespace fs = std::filesystem;  
+
+std::string GetExecutableDirectory() {  
+    char buffer[MAX_PATH];  
+    if (GetModuleFileNameA(NULL, buffer, sizeof(buffer)) != 0) {  
+        fs::path fullPath(buffer);  
+        return fullPath.parent_path().string();  
+    }  
+    return ""; // 如果失败，返回空字符串  
+}  
+
 MyAudioPluginHandler::MyAudioPluginHandler()
 {
   google::InitGoogleLogging("test");
@@ -63,30 +75,28 @@ MyAudioPluginHandler::MyAudioPluginHandler()
   // 设置日志输出目录
   FLAGS_log_dir = "./logs";
 
-  FLAGS_logtostdout = true;
-  FLAGS_colorlogtostdout = true;
-  FLAGS_logtostderr = true;
-  FLAGS_alsologtostderr = true;
+  std::string dir = GetExecutableDirectory();  
+  std::string home = dir+"/logs/";
+
+    // 设置日志级别  
+  FLAGS_alsologtostderr = true; // 设置日志消息除了日志文件之外是否去标准输出
+  std::string info_log = home+"info_";
+  google::SetLogDestination(google::GLOG_INFO, info_log.c_str());
+  std::string w_log = home+"w_";
+  google::SetLogDestination(google::GLOG_WARNING, w_log.c_str());
+  std::string e_log = home+"e_";
+  google::SetLogDestination(google::GLOG_ERROR, e_log.c_str());
+  std::string f_log = home+"f_";
+  google::SetLogDestination(google::GLOG_FATAL, f_log.c_str());
 
   LOG(INFO) << "Hello, GOOGLE!";  // INFO 级别的日志
-  LOG(WARNING) << "warning test";  // 会输出一个Warning日志  
-  LOG(ERROR) << "This should work";
-  // LOG_IF(ERROR, x > y) << "This should be also OK";
-
-  google::ShutdownGoogleLogging();
-
-  // google::InitGoogleLogging();
-  // std::string str = "class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> > __cdecl MyAudioPluginHandler::{ctor}::<lambda_21c91b596babde87656e45c85728742d>::operator ()(void) const";
-  // std::string str2 =str.substr(88, str.length()-88);
-  // std::cout << "str2 :: " << str2 << std::endl;
-  // Logger::LDEBUG("This is a debug message");
-  // LINFO("This is an info message");
-  // LWARNING("This is a warning message"); // 会输出
-  // LERROR("This is an error message");    // 会输出
+  LOG(WARNING) << "Hello, GOOGLE! warning test";  // 会输出一个Warning日志  
+  LOG(ERROR) << "Hello, GOOGLE! This should work";
 }
 
 MyAudioPluginHandler::~MyAudioPluginHandler()
 {
+  google::ShutdownGoogleLogging();
 }
 
 bool IsFileExist_from_utf8(const char *utf8FilePath)
