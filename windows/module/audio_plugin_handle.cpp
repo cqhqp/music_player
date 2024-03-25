@@ -80,6 +80,10 @@ MyAudioPluginHandler::MyAudioPluginHandler()
 
     // 设置日志级别  
   FLAGS_alsologtostderr = true; // 设置日志消息除了日志文件之外是否去标准输出
+  FLAGS_max_log_size = 10; // 设置最大日志文件大小（以MB为单位）
+  FLAGS_stop_logging_if_full_disk = true; // 设置是否在磁盘已满时避免日志记录到磁盘
+
+
   std::string info_log = home+"info_";
   google::SetLogDestination(google::GLOG_INFO, info_log.c_str());
   std::string w_log = home+"w_";
