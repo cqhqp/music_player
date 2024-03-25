@@ -70,6 +70,21 @@
         "stop_token": "cpp",
         "thread": "cpp"
     },
-    "cmake.sourceDirectory": "C:/Users/peter/Documents/git-code/music_player/windows/runner"
-    
+    "cmake.sourceDirectory": "C:/Users/peter/Documents/git-code/music_player/windows/runner",
+    "editor.minimap.enabled": true,
+    "C_Cpp.autocomplete": "Default",
+    "[cpp]": {
+        "editor.quickSuggestions": {
+            "comments": "on",
+            "strings": "on",
+            "other": "on"
+        }
+    },
+    "[c]": {
+        "editor.quickSuggestions": {
+            "comments": "on",
+            "strings": "on",
+            "other": "on"
+        }
+    }
 }

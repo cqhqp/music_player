@@ -7,6 +7,7 @@
 #include "audio_plugin_handle.h"
 #include <memory>
 
+#define GLOG_NO_ABBREVIATED_SEVERITIES
 #include <windows.h>
 #include <iostream>
 
@@ -16,21 +17,76 @@ extern "C"
 #include <libavformat/avformat.h>
 #include <libavutil/dict.h>
 };
+#include <glog/export.h>
+#include <glog/logging.h>
+// bool IsFileExist(const char *filePath)
+// {
+//   HANDLE hFile = CreateFileA(filePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+//   if (hFile == INVALID_HANDLE_VALUE)
+//   {
+//     DWORD dw = GetLastError();
+//     if (dw == ERROR_FILE_NOT_FOUND || dw == ERROR_PATH_NOT_FOUND)
+//     {
+//       return false; //
+//     }
+//     // ...
+//   }
+//   CloseHandle(hFile); //
+//   return true;        //
+// }
 
-bool IsFileExist(const char *filePath)
+// std::wstring stringToWstring(const std::string &str)
+// {
+//   int size_needed = MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), NULL, 0);
+//   std::wstring wstrTo(size_needed, 0);
+//   MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), &wstrTo[0], size_needed);
+//   return wstrTo;
+// }
+
+// size_t getFileSize1(const char *fileName)
+// {
+//   if (fileName == NULL)
+//   {
+//     return 0;
+//   }
+//   struct stat statbuf;
+//   statbuf.st_size = 0;
+//   stat(fileName, &statbuf);
+//   size_t filesize = statbuf.st_size;
+//   return filesize;
+// }
+
+MyAudioPluginHandler::MyAudioPluginHandler()
 {
-  HANDLE hFile = CreateFileA(filePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-  if (hFile == INVALID_HANDLE_VALUE)
-  {
-    DWORD dw = GetLastError();
-    if (dw == ERROR_FILE_NOT_FOUND || dw == ERROR_PATH_NOT_FOUND)
-    {
-      return false; //
-    }
-    // ...
-  }
-  CloseHandle(hFile); //
-  return true;        //
+  google::InitGoogleLogging("test");
+
+  // 设置日志输出目录
+  FLAGS_log_dir = "./logs";
+
+  FLAGS_logtostdout = true;
+  FLAGS_colorlogtostdout = true;
+  FLAGS_logtostderr = true;
+  FLAGS_alsologtostderr = true;
+
+  LOG(INFO) << "Hello, GOOGLE!";  // INFO 级别的日志
+  LOG(WARNING) << "warning test";  // 会输出一个Warning日志  
+  LOG(ERROR) << "This should work";
+  // LOG_IF(ERROR, x > y) << "This should be also OK";
+
+  google::ShutdownGoogleLogging();
+
+  // google::InitGoogleLogging();
+  // std::string str = "class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> > __cdecl MyAudioPluginHandler::{ctor}::<lambda_21c91b596babde87656e45c85728742d>::operator ()(void) const";
+  // std::string str2 =str.substr(88, str.length()-88);
+  // std::cout << "str2 :: " << str2 << std::endl;
+  // Logger::LDEBUG("This is a debug message");
+  // LINFO("This is an info message");
+  // LWARNING("This is a warning message"); // 会输出
+  // LERROR("This is an error message");    // 会输出
+}
+
+MyAudioPluginHandler::~MyAudioPluginHandler()
+{
 }
 
 bool IsFileExist_from_utf8(const char *utf8FilePath)
@@ -57,62 +113,12 @@ bool IsFileExist_from_utf8(const char *utf8FilePath)
   return true;
 }
 
-std::wstring stringToWstring(const std::string &str)
-{
-  int size_needed = MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), NULL, 0);
-  std::wstring wstrTo(size_needed, 0);
-  MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), &wstrTo[0], size_needed);
-  return wstrTo;
-}
-
-size_t getFileSize1(const char *fileName)
-{
-  if (fileName == NULL)
-  {
-    return 0;
-  }
-  struct stat statbuf;
-  statbuf.st_size = 0;
-  stat(fileName, &statbuf);
-  size_t filesize = statbuf.st_size;
-  return filesize;
-}
-
 void MyAudioPluginHandler::HandlePlay(const flutter::EncodableValue *param, std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result)
 {
-  std::cout << " ... HandlePlay ...!" << std::endl;
-
   const std::string arguments = std::get<std::string>(*param);
-  std::cout << " arguments: " << arguments << std::endl;
-  size_t siize = getFileSize1(arguments.c_str());
-  std::cout << " siize: " << siize << std::endl;
-  // if(siize>0)
-  // {
-  //   // folder exists
-  //   std::cout << " ... folder exists ...!" << std::endl;
-  //   result->Success(true);
-  //   return;
-  // }
-  // else
-  // {
-  //   std::cout << " ... no file ...!" << std::endl;
-  //   result->Success(false);
-  //   return;
-  // }
-  // DWORD dwAttr = GetFileAttributes(stringToWstring(arguments).c_str());
-  // if (dwAttr != 0xffffffff && (dwAttr & FILE_ATTRIBUTE_DIRECTORY))
-  // {
-  //   // folder exists
-  //   std::cout << " ... folder exists ...!" << std::endl;
-  //   result->Success(true);
-  //   return;
-  // }
-  // else
-  // {
-  //   std::cout << " ... no file ...!" << std::endl;
-  //   result->Success(false);
-  //   return;
-  // }
+  // std::cout << " arguments: " << arguments << std::endl;
+  // size_t siize = getFileSize1(arguments.c_str());
+  // std::cout << " siize: " << siize << std::endl;
 
   if (IsFileExist_from_utf8(arguments.c_str()))
   {
@@ -149,34 +155,36 @@ void MyAudioPluginHandler::HandlePlay(const flutter::EncodableValue *param, std:
       av_dump_format(fmt_ctx, 0, inFileName, 0);
       do
       {
-          AVCodecContext* codecCtx = NULL;
-          AVPacket* pkt = av_packet_alloc();
-          AVFrame* frame = av_frame_alloc();
-          int stream_index = av_find_best_stream(fmt_ctx, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0);
+        AVCodecContext *codecCtx = NULL;
+        AVPacket *pkt = av_packet_alloc();
+        AVFrame *frame = av_frame_alloc();
+        int stream_index = av_find_best_stream(fmt_ctx, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0);
 
-          printf("stream_index=%d\n", stream_index);
-          if (stream_index != -1)
+        printf("stream_index=%d\n", stream_index);
+        if (stream_index != -1)
+        {
+          AVStream *audioStream = fmt_ctx->streams[stream_index];
+          AVCodecParameters *aCodecPara = fmt_ctx->streams[stream_index]->codecpar;
+          const AVCodec *codec = avcodec_find_decoder(aCodecPara->codec_id);
+          if (!codec)
           {
-              AVStream* audioStream = fmt_ctx->streams[stream_index];
-              AVCodecParameters* aCodecPara = fmt_ctx->streams[stream_index]->codecpar;
-              const AVCodec* codec = avcodec_find_decoder(aCodecPara->codec_id);
-              if (!codec) {
-                  printf("Cannot find any codec for audio.\n");
-                  break;
-              }
-              codecCtx = avcodec_alloc_context3(codec);
-              if (avcodec_parameters_to_context(codecCtx, aCodecPara) < 0) {
-                  printf("Cannot alloc codec context.\n");
-                  break;
-              }
-              codecCtx->pkt_timebase = fmt_ctx->streams[stream_index]->time_base;
-
-              if (avcodec_open2(codecCtx, codec, NULL) < 0) {
-                  printf("Cannot open audio codec.\n");
-                  break;
-              }
-
+            printf("Cannot find any codec for audio.\n");
+            break;
           }
+          codecCtx = avcodec_alloc_context3(codec);
+          if (avcodec_parameters_to_context(codecCtx, aCodecPara) < 0)
+          {
+            printf("Cannot alloc codec context.\n");
+            break;
+          }
+          codecCtx->pkt_timebase = fmt_ctx->streams[stream_index]->time_base;
+
+          if (avcodec_open2(codecCtx, codec, NULL) < 0)
+          {
+            printf("Cannot open audio codec.\n");
+            break;
+          }
+        }
       } while (false);
 
       avformat_close_input(&fmt_ctx);
@@ -254,5 +262,4 @@ void MyAudioPluginHandler::HandleStop(const flutter::EncodableMap &arguments, st
   result->Success(true);
   // result->Error("Error", "Music already stoped!");
 }
-
 // 添加其他方法处理函数...

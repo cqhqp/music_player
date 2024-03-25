@@ -14,6 +14,7 @@
 #include "flutter/generated_plugin_registrant.h"
 #include "audio_plugin_handle.h"
 // #include "file_plugin_handle.h"
+#include "logger.h"
 
 #define WM_MY_CUSTOM_MESSAGE (WM_USER + 1) // 自定义消息，确保不与现有消息冲突  
 
@@ -123,6 +124,7 @@ bool FlutterWindow::OnCreate()
                     
                     WaitForSingleObject(semaphore, INFINITE);  
                     SendMessage(GetHandle(), WM_MY_CUSTOM_MESSAGE, 0, 0);
+                    // LDEBUG("This is a debug message");
                  }
               });
             timer_thread.detach();
