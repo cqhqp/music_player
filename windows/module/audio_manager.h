@@ -18,6 +18,7 @@ enum AudioEnum {
     AUDIO_CTL_STOP,
     AUDIO_CTL_DECODE,
     AUDIO_CTL_EXIT,
+    AUDIO_CTL_SEEK,
     
     AUDIO_STATA_STOPED,
     AUDIO_STATA_PLAYED,
@@ -38,6 +39,7 @@ public:
     void resume();
     void decode();
     void exit();
+    void seek(double value);
     void setStatus(AudioEnum stata); 
     // 提供一个公共的静态方法来获取Foo的单例对象
     static AudioManager &getInstance()
@@ -64,7 +66,7 @@ private:
     bool waitStata= false;
     std::string file_path;
 
-    using AudioVariant = std::variant<std::unique_ptr<AudioDecoder>, std::unique_ptr<AudioOutput>>;
+    using AudioVariant = std::variant<std::unique_ptr<double>, std::unique_ptr<AudioDecoder>, std::unique_ptr<AudioOutput>>;
 
     class TaskObj
     {

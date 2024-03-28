@@ -49,10 +49,19 @@ class AudioPlugin {
     }
   }
 
-  // 暂停音频
+  // 继续播放音频
   Future<void> resume() async {
     try {
       final bool result = await _channel.invokeMethod('resume');
+    } on PlatformException catch (e) {
+      print("Error pausing audio");
+    }
+  }
+
+  // 定位
+  Future<void> seek(double value) async {
+    try {
+      final bool result = await _channel.invokeMethod('seek', value);
     } on PlatformException catch (e) {
       print("Error pausing audio");
     }

@@ -79,7 +79,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
   void _onEvent(Object? event) {
     // 或者，如果你不确定 myObject 是否真的是一个 Map，你可以使用条件检查
     if (event is Map<dynamic, dynamic>) {
-      print("是一个map");
+      // print("是一个map");
       Map<String, double> convertedMap = {};
 
       for (var entry in event.entries) {
@@ -96,7 +96,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
       if (convertedMap.containsKey('max') && convertedMap['max'] is double) {
         double? max = convertedMap['max'];
         // 处理 max
-        print("max:" + max.toString());
+        // print("max:" + max.toString());
         if (slider_max != max && max is double) {
           setState(() {
             slider_max = max;
@@ -109,7 +109,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
       if (convertedMap.containsKey('sec') && convertedMap['sec'] is double) {
         double? sec = convertedMap['sec'];
         // 处理 sec
-        print("sec:" + sec.toString());
+        // print("sec:" + sec.toString());
         if (sec is double) {
           setState(() {
             _progress = sec;
@@ -194,6 +194,18 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
     } else {
       _play();
     }
+  }
+
+  // 设置进度
+  void _seek(double newValue) async {
+    _audioPlugin.seek(newValue);
+    setState(() {
+    });
+  }
+
+  // 开始seek
+  void _seekStart() async {
+    _audioPlugin.seek(-1);
   }
 
   // 停止
@@ -385,8 +397,16 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
                       value: _progress,
                       min: 0.0,
                       max: slider_max,
+                      onChangeEnd: (double newValue) {
+                        _seek(newValue);
+                      },
+                      onChangeStart: (double newValue) {
+                        _seekStart();
+                      },
                       onChanged: (double newValue) {
                         setState(() {
+                          String formattedDuration = formatDuration(newValue);  
+                          audio_cur_time = formattedDuration;
                           _progress = newValue;
                         });
                       },

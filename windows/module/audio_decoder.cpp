@@ -149,6 +149,12 @@ bool Mp3Decoder::decode()
                 // LOG(INFO) << "les:" << les;
                 // LOG(INFO) << "sec:" << sec;
                 this->bk(les, sec);
+                if( sec == 4.61162){
+                    LOG(INFO) << sec << " ---- " << pkt->pts;                     
+                }
+                if( sec >= 4.6 && sec <= 4.7){
+                    LOG(INFO) << sec << " ---- " << pkt->pts;                     
+                }
             }
             dec_ret = true;
         }
@@ -204,6 +210,19 @@ bool Mp3Decoder::decode()
     //     }
     // }
     return dec_ret;
+}
+
+bool Mp3Decoder::seek(double value)
+{
+    
+    int64_t timestamp = value / av_q2d(fmtCtx->streams[aStreamIndex]->time_base);
+    LOG(INFO) << "seek ... timestamp:"<< timestamp;
+
+    int ret = av_seek_frame(fmtCtx, aStreamIndex, timestamp, AVSEEK_FLAG_BACKWARD);  
+    if (ret < 0) {  
+        // 处理错误  
+    }
+    return false;
 }
 
 bool Mp3Decoder::isInitialized() const

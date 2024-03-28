@@ -94,6 +94,10 @@ bool FlutterWindow::OnCreate()
         {
           handler.HandleResume(param, std::move(result));
         }
+        else if (method_call.method_name() == "seek")
+        {
+          handler.HandleSeek(param, std::move(result));
+        }
         else
         {
           result->NotImplemented();

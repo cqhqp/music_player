@@ -170,6 +170,22 @@ void AudioManager::exit()
     LOG(INFO) << "[6] exit unlock.";
 }
 
+// 
+void AudioManager::seek(double value)
+{
+    LOG(INFO) << "seek.";
+    LOG(INFO) << "[7] seek lock.";
+    LOG(INFO)<< " value:" << value;
+    std::unique_ptr<double> valuePtr = std::make_unique<double>(value);
+    std::unique_ptr<AudioVariant> audioVariant = std::make_unique<AudioVariant>(std::move(valuePtr));
+
+    std::unique_ptr<TaskObj> taskObj = std::make_unique<TaskObj>(AUDIO_CTL_SEEK, std::move(audioVariant));
+    std::lock_guard<std::mutex> lock(taskMutex);
+    taskMsgQueue.push(std::move(taskObj));
+    condition.notify_one(); // 通知线程
+    LOG(INFO) << "[7] seek unlock.";
+}
+
 void AudioManager::setStatus(AudioEnum stata)
 {
     waitStata = false;
@@ -295,6 +311,39 @@ void AudioManager::loop()
             {
                 this->callback(AUDIO_STATA_PLAYED);
                 decode();
+            }
+        }
+        else if (msgObj->obj_msg == AUDIO_CTL_SEEK)
+        {
+            LOG(INFO) << "AUDIO_CTL_SEEK";
+            
+            if (decoder)
+            {
+                {
+                    std::unique_lock<std::mutex> lock(taskMutex);
+                    // 需要清空队列
+                    while (!taskMsgQueue.empty())
+                    {
+                        taskMsgQueue.pop();
+                    }
+                }
+
+                std::unique_ptr<AudioVariant> obj = std::move(msgObj->obj_variant);
+                if (auto valuePtr = std::get_if<std::unique_ptr<double>>(obj.get())) 
+                {
+                    std::unique_ptr<double> value = std::move(*valuePtr);
+                    double v = *value.get();
+                    LOG(INFO)<< " value:" << v;
+                    if(v != -1){
+                        decoder->seek(v);
+                        decode();
+                    }
+                }
+                else
+                {
+                    std::cout << "std::unique_ptr<AudioDecoder> not found in variant!" << std::endl;
+                }
+
             }
         }
         else if (msgObj->obj_msg == AUDIO_CTL_EXIT)

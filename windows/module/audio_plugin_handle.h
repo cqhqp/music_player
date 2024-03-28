@@ -15,6 +15,7 @@ public:
   void HandlePause(const flutter::EncodableValue *param, std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);  
   void HandleStop(const flutter::EncodableMap& args, std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
   void HandleResume(const flutter::EncodableValue *param, std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
+  void HandleSeek(const flutter::EncodableValue *param, std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
   
   MyAudioPluginHandler();
   virtual ~MyAudioPluginHandler();

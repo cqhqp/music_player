@@ -191,4 +191,10 @@ void MyAudioPluginHandler::HandleResume(const flutter::EncodableValue *param, st
   AudioManager::getInstance().resume();
   result->Success(true);
 }
+void MyAudioPluginHandler::HandleSeek(const flutter::EncodableValue *param, std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result)
+{
+  const double value = std::get<double>(*param);
+  AudioManager::getInstance().seek(value);
+  result->Success(true);
+}
 // 添加其他方法处理函数...

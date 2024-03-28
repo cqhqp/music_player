@@ -46,6 +46,7 @@ public:
     virtual bool initialize(const std::string &filePath, const std::function<void(double, double)> &callback) = 0;       // 初始化解码器
     virtual void release() = 0;                                     // 初始化解码器
     virtual bool decode() = 0; // 解码数据
+    virtual bool seek(double value) = 0;
     virtual bool isInitialized() const = 0;                         // 检查解码器是否已初始化
 };
 
@@ -55,6 +56,7 @@ public:
     bool initialize(const std::string &filePath, const std::function<void(double, double)> &callback) override;
     void release() override;
     bool decode() override;
+    bool seek(double value) override;
     bool isInitialized() const override;
     ~Mp3Decoder();
 private:
