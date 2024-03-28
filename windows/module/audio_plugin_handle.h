@@ -7,13 +7,14 @@
 #include <flutter/method_channel.h>
 #include <flutter/standard_method_codec.h>
 
-//#include "logger.h"
+#include "audio_manager.h"
 
 class MyAudioPluginHandler {  
 public:  
   void HandlePlay(const flutter::EncodableValue *param, std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);  
   void HandlePause(const flutter::EncodableValue *param, std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);  
   void HandleStop(const flutter::EncodableMap& args, std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
+  void HandleResume(const flutter::EncodableValue *param, std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
   
   MyAudioPluginHandler();
   virtual ~MyAudioPluginHandler();

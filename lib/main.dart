@@ -1,3 +1,5 @@
+import 'dart:ffi';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import './audio_plugin.dart';
@@ -28,6 +30,7 @@ class AudioPlayerScreen extends StatefulWidget {
 
 class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
   bool _isPlaying = false;
+  bool _isPause = false;
   int _currentIndex = 0; // 当前播放歌曲的索引
   double _volume = 0.0;
   double _progress = 0.0;
@@ -37,13 +40,19 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
   String _song_name = "NONE";
   String _song_artist = "NONE";
   String _song_album = "NONE";
-  static const EventChannel eventChannel = EventChannel('samples.flutter.io/charging');
+  double slider_max = 0.0;
+  String audio_max_time = "0:0:0";
+  String audio_cur_time = "0:0:0";
+  static const EventChannel eventChannel =
+      EventChannel('samples.flutter.io/charging');
 
   @override
   void initState() {
     super.initState();
     _isPlaying = false;
-    eventChannel.receiveBroadcastStream().listen(_onEvent, onError: _onError); // 订阅底层事件
+    eventChannel
+        .receiveBroadcastStream()
+        .listen(_onEvent, onError: _onError); // 订阅底层事件
   }
 
   @override
@@ -51,16 +60,91 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
     super.dispose();
   }
 
+  String formatTwoDigits(int number) {
+    if (number < 10) {
+      return '0$number'; // 在一位数前面添加'0'
+    } else {
+      return number.toString(); // 已经是两位数，直接转换为字符串
+    }
+  }
+
+  String formatDuration(double durationInSeconds) {
+    int hours = (durationInSeconds / 60 / 60).floor();
+    int minutes = (durationInSeconds / 60).floor();
+    int seconds = (durationInSeconds % 60).round();
+
+    return '${formatTwoDigits(hours)}:${formatTwoDigits(minutes)}:${formatTwoDigits(seconds)}';
+  }
+
   void _onEvent(Object? event) {
-    String str = event.toString();
-    setState(() {
-      print("event:"+str);
-    });
+    // 或者，如果你不确定 myObject 是否真的是一个 Map，你可以使用条件检查
+    if (event is Map<dynamic, dynamic>) {
+      print("是一个map");
+      Map<String, double> convertedMap = {};
+
+      for (var entry in event.entries) {
+        if (entry.key is String && entry.value is double) {
+          convertedMap[entry.key] = entry.value;
+        } else {
+          // 处理类型不匹配的情况，可以选择忽略、记录日志或抛出异常
+          print(
+              'Key ${entry.key} or value ${entry.value} does not match the expected type.');
+        }
+      }
+
+      // 现在您可以使用decodedEvent，它应该是一个Dart Map
+      if (convertedMap.containsKey('max') && convertedMap['max'] is double) {
+        double? max = convertedMap['max'];
+        // 处理 max
+        print("max:" + max.toString());
+        if (slider_max != max && max is double) {
+          setState(() {
+            slider_max = max;
+            String formattedDuration = formatDuration(slider_max);  
+            audio_max_time = formattedDuration;
+          });
+        }
+      }
+
+      if (convertedMap.containsKey('sec') && convertedMap['sec'] is double) {
+        double? sec = convertedMap['sec'];
+        // 处理 sec
+        print("sec:" + sec.toString());
+        if (sec is double) {
+          setState(() {
+            _progress = sec;
+            String formattedDuration = formatDuration(sec);  
+            audio_cur_time = formattedDuration;
+          });
+        }
+      }
+    } else {
+      // // 处理错误或进行其他操作，因为 myObject 不是一个 Map
+      // print('myObject is not a Map<String, Object?>');
+
+      String str = event.toString();
+      setState(() {
+        print("event:" + str);
+        if (str == "stoped") {
+          _isPlaying = false;
+          _isPause = false;
+          _progress = 0.0;
+        }
+        if (str == "paused") {
+          _isPlaying = false;
+          _isPause = true;
+        }
+        if (str == "playing") {
+          _isPlaying = true;
+          _isPause = false;
+        }
+        print("_isPlaying:" + _isPlaying.toString());
+      });
+    }
   }
 
   void _onError(Object error) {
-    setState(() {
-    });
+    setState(() {});
   }
 
   // 停止
@@ -91,7 +175,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
 
   // 播放
   void _play() async {
-    _isPlaying = true;    
+    _isPlaying = true;
     Map<String?, String?> out = await _audioPlugin.play(file.path);
     _song_name = out["title"].toString();
     _song_artist = out["artist"].toString();
@@ -101,12 +185,14 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
   // 播放和暂停
   void _playPause() async {
     setState(() {
-      _isPlaying = !_isPlaying;
+      // _isPlaying = !_isPlaying;
     });
     if (_isPlaying) {
-      _play();
-    } else {
       _audioPlugin.pause();
+    } else if (_isPause) {
+      _audioPlugin.resume();
+    } else {
+      _play();
     }
   }
 
@@ -130,8 +216,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
       SizedBox(height: 10),
       // 其他歌曲信息（如艺术家、专辑等）
       Text(
-        // 歌曲名        
-        _song_artist+":"+_song_album,
+        _song_artist + ":" + _song_album,
         style: TextStyle(fontSize: 20),
       ),
 
@@ -160,16 +245,21 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
               tooltip: 'Stop',
             ),
             IconButton(
+              icon: const Icon(Icons.skip_previous),
+              iconSize: 50,
+              onPressed: () {},
+              tooltip: 'Previous Song',
+            ),
+            IconButton(
               icon: const Icon(Icons.skip_next),
               iconSize: 50,
               onPressed: () {},
               tooltip: 'Next Song',
             ),
-            IconButton(
-              icon: const Icon(Icons.skip_previous),
-              iconSize: 50,
-              onPressed: () {},
-              tooltip: 'Previous Song',
+            Text(
+              // 时间显示
+              audio_cur_time + " / " + audio_max_time,
+              style: TextStyle(fontSize: 20),
             ),
           ],
         ),
@@ -236,7 +326,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
       ),
       onTap: () {
         setState(() {
-          _currentIndex = index;  
+          _currentIndex = index;
           file = _songs[_currentIndex];
           _play();
         });
@@ -250,7 +340,10 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
       itemCount: _songs.length,
       itemBuilder: (BuildContext context, int index) {
         return _buildPlaylistItem(
-            _songs[index].filename.substring(0, _songs[index].filename.lastIndexOf('.')), index);
+            _songs[index]
+                .filename
+                .substring(0, _songs[index].filename.lastIndexOf('.')),
+            index);
       },
     );
   }
@@ -291,7 +384,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
                     child: Slider(
                       value: _progress,
                       min: 0.0,
-                      max: 100.0,
+                      max: slider_max,
                       onChanged: (double newValue) {
                         setState(() {
                           _progress = newValue;
@@ -306,7 +399,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
               ),
             ),
             Expanded(
-              flex: 3, // 左侧按钮占20%
+              flex: 3, // 右侧列表占30%
               child: _buildPlaylist(),
             )
           ],

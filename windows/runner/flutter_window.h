@@ -32,11 +32,13 @@ class FlutterWindow : public Win32Window {
 
 
   // EventStream handlers:
-  void OnStreamListen(std::unique_ptr<flutter::EventSink<>>&& events);
+  void OnStreamListen(std::unique_ptr<flutter::EventSink<>>&& events, const std::string value);
   void OnStreamCancel();
 
   // Sends a state event to |event_sink_| with the current charging status.
-  void SendStateEvent();
+  void SendStateEvent(const std::string value);
+  void SendStateEventProcess(double max, double sec);
+  
   std::unique_ptr<flutter::EventSink<>> event_sink_;
   HPOWERNOTIFY power_notification_handle_ = nullptr;
 
