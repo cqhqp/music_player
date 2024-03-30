@@ -75,6 +75,12 @@ void AudioManager::play()
     std::unique_ptr<AudioDecoder> decoder_;
     decoder_ = std::make_unique<Mp3Decoder>();
     bool init_ok = decoder_->initialize(file_path, playProcessCallBack);
+    decoder_->set_pcm_back([](const uint8_t* data, int64_t size, bool planar, int channels)
+                           {
+        // std::unique_ptr<AudioDataObj> data = std::make_unique<AudioDataObj>(std::move(data_ptr), planar, channels);
+        LOG(INFO) << "lambda set_pcm_back  .. add ";
+        PCMCacheManager::getInstance().add(data, size, planar, channels); });
+
     if (init_ok)
     {
         LOG(INFO) << "[1] play lock.";
@@ -170,12 +176,12 @@ void AudioManager::exit()
     LOG(INFO) << "[6] exit unlock.";
 }
 
-// 
+//
 void AudioManager::seek(double value)
 {
     LOG(INFO) << "seek.";
     LOG(INFO) << "[7] seek lock.";
-    LOG(INFO)<< " value:" << value;
+    LOG(INFO) << " value:" << value;
     std::unique_ptr<double> valuePtr = std::make_unique<double>(value);
     std::unique_ptr<AudioVariant> audioVariant = std::make_unique<AudioVariant>(std::move(valuePtr));
 
@@ -272,15 +278,18 @@ void AudioManager::loop()
         }
         else if (msgObj->obj_msg == AUDIO_CTL_DECODE)
         {
-            // LOG(INFO) << "AUDIO_CTL_DECODE";
+            LOG(INFO) << "AUDIO_CTL_DECODE";
             if (decoder)
             {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 bool ret = decoder->decode();
-                if(ret)
+                if (ret)
                     decode();
                 else
+                {
+                    LOG(INFO) << "AUDIO_CTL_DECODE ret:" << ret;
                     this->callback(AUDIO_STATA_STOPED);
+                }
             }
             else
             {
@@ -316,7 +325,7 @@ void AudioManager::loop()
         else if (msgObj->obj_msg == AUDIO_CTL_SEEK)
         {
             LOG(INFO) << "AUDIO_CTL_SEEK";
-            
+
             if (decoder)
             {
                 {
@@ -329,21 +338,22 @@ void AudioManager::loop()
                 }
 
                 std::unique_ptr<AudioVariant> obj = std::move(msgObj->obj_variant);
-                if (auto valuePtr = std::get_if<std::unique_ptr<double>>(obj.get())) 
+                if (auto valuePtr = std::get_if<std::unique_ptr<double>>(obj.get()))
                 {
                     std::unique_ptr<double> value = std::move(*valuePtr);
                     double v = *value.get();
-                    LOG(INFO)<< " value:" << v;
-                    if(v != -1){
+                    LOG(INFO) << " value:" << v;
+                    if (v != -1)
+                    {
                         decoder->seek(v);
-                        decode();
+                        if (!isPaused)
+                            decode();
                     }
                 }
                 else
                 {
                     std::cout << "std::unique_ptr<AudioDecoder> not found in variant!" << std::endl;
                 }
-
             }
         }
         else if (msgObj->obj_msg == AUDIO_CTL_EXIT)

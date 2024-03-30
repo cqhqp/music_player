@@ -15,6 +15,7 @@ add_executable(${BINARY_NAME} WIN32
   "${CMAKE_SOURCE_DIR}/module/audio_manager.cpp"
   "${CMAKE_SOURCE_DIR}/module/audio_metadata.cpp"
   "${CMAKE_SOURCE_DIR}/module/audio_decoder.cpp"
+  "${CMAKE_SOURCE_DIR}/module/audio_cache.cpp"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
   "Runner.rc"
   "runner.exe.manifest"

@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <string>
+#include <memory>
 #include <functional>
 extern "C"
 {
@@ -44,6 +45,7 @@ class AudioDecoder
 public:
     virtual ~AudioDecoder() {}
     virtual bool initialize(const std::string &filePath, const std::function<void(double, double)> &callback) = 0;       // 初始化解码器
+    virtual void set_pcm_back(const std::function<void(const uint8_t*, int64_t, bool, int)> &callback) = 0;  //const std::unique_ptr<const std::vector<float>>, bool
     virtual void release() = 0;                                     // 初始化解码器
     virtual bool decode() = 0; // 解码数据
     virtual bool seek(double value) = 0;
@@ -54,6 +56,7 @@ class Mp3Decoder : public AudioDecoder
 {
 public:
     bool initialize(const std::string &filePath, const std::function<void(double, double)> &callback) override;
+    void set_pcm_back(const std::function<void(const uint8_t*, int64_t, bool, int)> &callback) override;  
     void release() override;
     bool decode() override;
     bool seek(double value) override;
@@ -62,12 +65,16 @@ public:
 private:
     const char *inFileName = nullptr;
     std::function<void(double, double)> bk;
+    std::function<void(const std::unique_ptr<const std::vector<float>>, bool, int)> _data_back = nullptr;
+    std::function<void(const uint8_t*, int64_t, bool, int)> _u8data_back = nullptr;
 
     AVFormatContext *fmtCtx =  nullptr;
     AVCodecContext *codecCtx =  nullptr;
     AVPacket *pkt= nullptr;
     AVFrame *frame = nullptr;
     int aStreamIndex = -1;
+    int64_t seek_time = 0;
+    double seek_dec = 0;
 };
 
 #endif // DECODER_H

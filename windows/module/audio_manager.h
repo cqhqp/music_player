@@ -4,7 +4,7 @@
 #include <memory>
 #include "audio_decoder.h"
 #include "audio_out.h"
-#include "audio_buffer.h"
+#include "audio_cache.h"
 #include <functional>
 #include <future>
 #include <queue>
@@ -49,14 +49,9 @@ public:
 
 private:
     std::unique_ptr<AudioOutput> output_;
-    std::unique_ptr<AudioBuffer> buffer_;
 
     std::function<void(AudioEnum)> callback;
     std::function<void(double, double)> playProcessCallBack;
-    // std::atomic<bool> quitRequested{false};
-    // std::atomic<bool> stopTask{false};
-    // std::atomic<bool> isStopTask{true};
-    // std::atomic<bool> paused{false};
     std::mutex taskMutex;
     std::condition_variable condition;
     std::future<void> _thread;
@@ -83,12 +78,12 @@ private:
     using VariantQueue = std::queue<std::unique_ptr<TaskObj>>;
     VariantQueue taskMsgQueue;
 
+    void loop();
+
     AudioManager();
     ~AudioManager();
     AudioManager(const AudioManager &) = delete;
     AudioManager &operator=(const AudioManager &) = delete;
-
-    void loop();
 
     // 单例类，声明为AudioManager的友元
     class Singleton

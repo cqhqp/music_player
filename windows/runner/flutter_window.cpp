@@ -96,6 +96,7 @@ bool FlutterWindow::OnCreate()
         }
         else if (method_call.method_name() == "seek")
         {
+          _seekflag = true;
           handler.HandleSeek(param, std::move(result));
         }
         else
@@ -149,7 +150,13 @@ bool FlutterWindow::OnCreate()
                                                    { SendMessage(GetHandle(), WM_AUDIO_STATA_MESSAGE, msg, 0); },
                                                    [&](double max, double sec)
                                                    {
-                                                     SendMessage(GetHandle(), WM_AUDIO_SECOEND_MESSAGE, max, sec);
+                                                     if (_seekflag)
+                                                     {
+                                                       LOG(WARNING) << "seekflag SendMessage sec:" << sec;
+                                                     }
+                                                     double *max_ptr = new double(max); // 获取原始指针
+                                                     double *sec_ptr = new double(sec); // 获取原始指针
+                                                     SendMessage(GetHandle(), WM_AUDIO_SECOEND_MESSAGE, reinterpret_cast<LPARAM>(max_ptr), reinterpret_cast<LPARAM>(sec_ptr));
                                                    });
 
             this->OnStreamListen(std::move(events), "");
@@ -232,7 +239,13 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     break;
 
   case WM_AUDIO_SECOEND_MESSAGE:
-    SendStateEventProcess((double)wparam, (double)lparam);
+    double *maxPtr = reinterpret_cast<double *>(wparam);
+    double *secPtr = reinterpret_cast<double *>(lparam);
+    const double m = *maxPtr;
+    const double s = *secPtr;
+    delete maxPtr;
+    delete secPtr;
+    SendStateEventProcess(m, s);
     break;
   }
 
@@ -251,31 +264,10 @@ void FlutterWindow::OnStreamCancel() { event_sink_ = nullptr; }
 void FlutterWindow::SendStateEvent(const std::string value)
 {
   // event_sink_->Error("UNAVAILABLE", "Charging status unavailable");
-  // SYSTEM_POWER_STATUS status;
-  // if (GetSystemPowerStatus(&status) == 0 || status.ACLineStatus == 255)
-  // {
-  //   event_sink_->Error("UNAVAILABLE", "Charging status unavailable");
-  // }
-  // else
-  // {
-  //   event_sink_->Success(flutter::EncodableValue(
-  //       status.ACLineStatus == 1 ? "charging" : "discharging"));
-  // }
-  // event_sink_->Success(flutter::EncodableValue(message_idx));
-  // event_sink_->Success(flutter::EncodableValue(value));
-  
-
-  // std::map<flutter::EncodableValue, flutter::EncodableValue> res = flutter::EncodableMap{};
-
-  // std::string k1 = "stata";
-  // double v1 = value;
-  // res[k1] = v1;
-
-  // event_sink_->Success(res);
   event_sink_->Success(flutter::EncodableValue(value));
 }
 
-void FlutterWindow::SendStateEventProcess(double max, double sec)
+void FlutterWindow::SendStateEventProcess(const double max, const double sec)
 {
 
   std::map<flutter::EncodableValue, flutter::EncodableValue> res = flutter::EncodableMap{};
@@ -284,6 +276,11 @@ void FlutterWindow::SendStateEventProcess(double max, double sec)
   double v1 = max;
   std::string k2 = "sec";
   double v2 = sec;
+  if (_seekflag)
+  {
+    _seekflag = false;
+    LOG(WARNING) << "seekflag sec:" << sec;
+  }
 
   res[k1] = v1;
   res[k2] = v2;

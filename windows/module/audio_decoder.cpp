@@ -2,7 +2,8 @@
 
 #include <glog/export.h>
 #include <glog/logging.h>
-
+#include <string>
+#include <algorithm> // for std::transform
 #define av_ts2str2(ts, buf) av_ts_make_string(buf, ts)
 #define av_ts2timestr2(ts, tb, buf) av_ts_make_time_string(buf, ts, tb)
 
@@ -82,6 +83,11 @@ bool Mp3Decoder::initialize(const std::string &filePath, const std::function<voi
     return true;
 }
 
+void Mp3Decoder::set_pcm_back(const std::function<void(const uint8_t*, int64_t, bool, int)> &callback)
+{
+    this->_u8data_back = callback;
+}
+
 void Mp3Decoder::release()
 {
     if (frame)
@@ -102,6 +108,8 @@ bool Mp3Decoder::decode()
     int i, ch, ret;
 
     bool dec_ret = false;
+    bool dowhile = false;
+    bool showdebugseek = false;
     do
     {
 
@@ -122,22 +130,36 @@ bool Mp3Decoder::decode()
                     LOG(ERROR) << "Error: av_readframe failed.";
                 }
                 av_packet_unref(pkt);
-                break;
+                // break;
+            }
+        }
+
+        if (seek_dec != 0 && pkt->stream_index == aStreamIndex)
+        {
+            double sec = pkt->pts * av_q2d(fmtCtx->streams[aStreamIndex]->time_base);
+            LOG(WARNING) << " decode pkt:" << sec;
+            if (sec < seek_dec)
+            {
+                av_packet_unref(pkt);
+                LOG(WARNING) << "sec < seek_dec.";
+                dowhile = true;
+                continue;
+            }
+            else
+            {
+                showdebugseek = true;
+                dowhile = false;
+                seek_dec = 0;
+                seek_time = 0;
             }
         }
 
         // 在这里处理数据包
         // ...
+        if (pkt->stream_index == aStreamIndex)
         {
-            // 这是一个音频数据包
             AVCodecParameters *codecpar = fmtCtx->streams[pkt->stream_index]->codecpar;
             int channels = codecpar->channels;
-            // LOG(INFO) << "channels:" << channels;
-
-            // char timeStr[AV_TS_MAX_STRING_SIZE] = {0};
-            // av_ts_make_time_string(timeStr, (int64_t)pkt->pts, &fmtCtx->streams[pkt->stream_index]->time_base);
-            // LOG(INFO) << "pkt->pts time1::" << timeStr;
-            // log_packet(fmtCtx, pkt, "in");
             if (pkt->pts == AV_NOPTS_VALUE)
             {
                 LOG(INFO) << "AV_NOPTS_VALUE";
@@ -148,20 +170,105 @@ bool Mp3Decoder::decode()
                 double sec = pkt->pts * av_q2d(fmtCtx->streams[aStreamIndex]->time_base);
                 // LOG(INFO) << "les:" << les;
                 // LOG(INFO) << "sec:" << sec;
-                this->bk(les, sec);
-                if( sec == 4.61162){
-                    LOG(INFO) << sec << " ---- " << pkt->pts;                     
+                if (seek_time == 0)
+                {
+                    if (showdebugseek)
+                    {
+                        LOG(WARNING) << "bk sec:" << sec;
+                    }
+                    this->bk(les, sec);
                 }
-                if( sec >= 4.6 && sec <= 4.7){
-                    LOG(INFO) << sec << " ---- " << pkt->pts;                     
+
+                ret = avcodec_send_packet(codecCtx, pkt);
+                if (ret < 0)
+                {
+                    LOG(ERROR) << "Error: avcodec_send_packet failed.";
+                }
+
+                while (ret >= 0)
+                {
+                    ret = avcodec_receive_frame(codecCtx, frame);
+                    if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
+                        break;
+                    else if (ret < 0)
+                    {
+                        LOG(ERROR) << "Error during decoding";
+                        dec_ret = false;
+                        av_packet_unref(pkt);
+                        return dec_ret;
+                    }
+
+                    // 检查样本格式
+                    enum AVSampleFormat sample_fmt = (enum AVSampleFormat)frame->format;
+                    std::string fmt_str;
+                    int linesize;
+                    std::vector<int> t_data_size(frame->channels);
+                    // const std::unique_ptr<const std::vector<float>> vecPtr = std::make_unique<const std::vector<float>>(frame->nb_samples*frame->channels);
+
+                    switch (sample_fmt)
+                    {
+                    case AV_SAMPLE_FMT_U8:
+                        fmt_str = "8-bit unsigned integer";
+                        break;
+                    case AV_SAMPLE_FMT_S16:
+                        fmt_str = "16-bit signed integer";
+                        break;
+                    case AV_SAMPLE_FMT_S32:
+                        fmt_str = "32-bit signed integer";
+                        break;
+                    case AV_SAMPLE_FMT_FLT:
+                        fmt_str = "32-bit float";
+                        break;
+                    case AV_SAMPLE_FMT_DBL:
+                        fmt_str = "64-bit float";
+                        break;
+                    case AV_SAMPLE_FMT_FLTP:
+                        fmt_str = "32-bit float planar";
+                        {
+                            std::vector<uint8_t> u8_vec_pcm;
+                            size_t all_data_size = 0;
+                            frame->linesize[0];
+                            all_data_size = av_samples_get_buffer_size(
+                                &linesize, frame->channels, frame->nb_samples, (AVSampleFormat)frame->format, 0);
+                            LOG(INFO) << "all_data_size:" << all_data_size;
+                            LOG(INFO) << "linesize:" << linesize;
+                            LOG(INFO) << "linesize[0] :" << frame->linesize[0];
+                            LOG(INFO) << "nb_samples:" << frame->nb_samples;
+                            LOG(INFO) << "channels:" << frame->channels;
+                            _u8data_back(frame->data[0], all_data_size, true, frame->channels);
+                        }
+                        // u8_vec_pcm = std::vector<uint8_t>(all_data_size);
+                        // memcpy(&u8_vec_pcm[0], frame->data[0], all_data_size);
+                        // {
+                        //     // 创建一个 float 类型的 vector，其大小与 uint8_t vector 相同
+                        //     std::vector<float> vec_float(u8_vec_pcm.size());
+                        //     // 使用 std::transform 将 uint8_t 转换为 float
+                        //     // 这里假设简单的类型转换即可，但你可能需要更复杂的转换逻辑
+                        //     std::transform(u8_vec_pcm.begin(), u8_vec_pcm.end(), vec_float.begin(),
+                        //                    [](uint8_t val)
+                        //                    { return static_cast<float>(val); });
+                        //     // 创建一个指向 const std::vector<float> 的 unique_ptr
+                        //     std::unique_ptr<const std::vector<float>> vecPtr =
+                        //         std::make_unique<const std::vector<float>>(vec_float);
+                        //     if (_data_back)
+                        //     {
+                        //         _data_back(std::move(vecPtr), true, frame->channels);
+                        //     }
+                        // }
+                        break;
+                    // ... 其他格式 ...
+                    default:
+                        fmt_str = "Unknown";
+                    }
+                    LOG(INFO) << "Audio is " << fmt_str;
                 }
             }
-            dec_ret = true;
         }
+        dec_ret = true;
 
         // 释放数据包
         av_packet_unref(pkt);
-    } while (0);
+    } while (dowhile);
 
     // if(pkt->stream_index== aStreamIndex){
     //     ret = avcodec_send_packet(codecCtx, pkt);
@@ -214,13 +321,19 @@ bool Mp3Decoder::decode()
 
 bool Mp3Decoder::seek(double value)
 {
-    
-    int64_t timestamp = value / av_q2d(fmtCtx->streams[aStreamIndex]->time_base);
-    LOG(INFO) << "seek ... timestamp:"<< timestamp;
 
-    int ret = av_seek_frame(fmtCtx, aStreamIndex, timestamp, AVSEEK_FLAG_BACKWARD);  
-    if (ret < 0) {  
-        // 处理错误  
+    int64_t timestamp = (value / double(av_q2d(fmtCtx->streams[aStreamIndex]->time_base)));
+    seek_time = timestamp;
+    seek_dec = value;
+    double dec = timestamp * av_q2d(fmtCtx->streams[aStreamIndex]->time_base);
+    LOG(WARNING) << "seek ... timestamp:" << timestamp;
+    LOG(WARNING) << "seek ... dec:" << dec;
+    LOG(WARNING) << "seek ... value:" << value;
+
+    int ret = av_seek_frame(fmtCtx, aStreamIndex, timestamp, AVSEEK_FLAG_BACKWARD);
+    if (ret < 0)
+    {
+        // 处理错误
     }
     return false;
 }

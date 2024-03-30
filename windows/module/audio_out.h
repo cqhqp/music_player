@@ -2,10 +2,10 @@
 #define AUDIOOUTPUT_H  
   
 #include <cstdint>  
-class AudioOutput {  
+class IAudioOutput {  
 public:  
-    virtual ~AudioOutput() {}  
-    virtual void play(const uint8_t* data, size_t size) = 0;  
+    virtual ~IAudioOutput() {}  
+    virtual void play() = 0;  
 };  
   
 #endif // AUDIOOUTPUT_H

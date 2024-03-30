@@ -34,6 +34,9 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
   int _currentIndex = 0; // 当前播放歌曲的索引
   double _volume = 0.0;
   double _progress = 0.0;
+  bool _seekflag = false;
+  bool _seekstart = false;
+  bool _seekend = false;
   List<AudioFile> _songs = [];
   AudioPlugin _audioPlugin = new AudioPlugin();
   AudioFile file = new AudioFile("name", "type", 0, null);
@@ -70,8 +73,9 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
 
   String formatDuration(double durationInSeconds) {
     int hours = (durationInSeconds / 60 / 60).floor();
-    int minutes = (durationInSeconds / 60).floor();
-    int seconds = (durationInSeconds % 60).round();
+    int minutes = ((durationInSeconds % 3600) / 60).floor();
+    // int seconds = (durationInSeconds % 60).round(); // 不能用round，会导致seek时，时间进度跳变
+    int seconds = (durationInSeconds % 60).floor();
 
     return '${formatTwoDigits(hours)}:${formatTwoDigits(minutes)}:${formatTwoDigits(seconds)}';
   }
@@ -100,7 +104,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
         if (slider_max != max && max is double) {
           setState(() {
             slider_max = max;
-            String formattedDuration = formatDuration(slider_max);  
+            String formattedDuration = formatDuration(slider_max);
             audio_max_time = formattedDuration;
           });
         }
@@ -112,8 +116,13 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
         // print("sec:" + sec.toString());
         if (sec is double) {
           setState(() {
-            _progress = sec;
-            String formattedDuration = formatDuration(sec);  
+            if(!_seekstart)
+              _progress = sec;
+            if(_seekflag){
+              _seekflag = false;
+              print("_seekflag  _progress:" + _progress.toString());
+            }
+            String formattedDuration = formatDuration(sec);
             audio_cur_time = formattedDuration;
           });
         }
@@ -151,7 +160,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
   void _open() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['mp3', 'MP3'],
+      allowedExtensions: ['mp3', 'MP3', 'm4a'],
     );
     if (result != null) {
       print(result.files.single.name);
@@ -199,8 +208,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
   // 设置进度
   void _seek(double newValue) async {
     _audioPlugin.seek(newValue);
-    setState(() {
-    });
+    setState(() {});
   }
 
   // 开始seek
@@ -399,13 +407,27 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
                       max: slider_max,
                       onChangeEnd: (double newValue) {
                         _seek(newValue);
+                        _seekflag = true;
+                        _seekend = true;
+                        _seekstart = false;
+                        setState(() {
+                          _progress = newValue;
+                          String formattedDuration = formatDuration(newValue);
+                          audio_cur_time = formattedDuration;
+                        });
                       },
                       onChangeStart: (double newValue) {
                         _seekStart();
+                        _seekstart = true;
+                        setState(() {
+                          _progress = newValue;
+                          String formattedDuration = formatDuration(newValue);
+                          audio_cur_time = formattedDuration;
+                        });
                       },
                       onChanged: (double newValue) {
                         setState(() {
-                          String formattedDuration = formatDuration(newValue);  
+                          String formattedDuration = formatDuration(newValue);
                           audio_cur_time = formattedDuration;
                           _progress = newValue;
                         });
