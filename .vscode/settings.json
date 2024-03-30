@@ -86,7 +86,8 @@
         "unordered_set": "cpp",
         "future": "cpp",
         "coroutine": "cpp",
-        "resumable": "cpp"
+        "resumable": "cpp",
+        "*.rh": "cpp"
     },
     "cmake.sourceDirectory": "C:/Users/peter/Documents/git-code/music_player/windows/runner",
     "editor.minimap.enabled": true,

@@ -17,6 +17,7 @@ enum AudioEnum {
     AUDIO_CTL_RESUME,
     AUDIO_CTL_STOP,
     AUDIO_CTL_DECODE,
+    AUDIO_CTL_OUTPUT,
     AUDIO_CTL_EXIT,
     AUDIO_CTL_SEEK,
     
@@ -38,6 +39,7 @@ public:
     void stop();
     void resume();
     void decode();
+    void output();
     void exit();
     void seek(double value);
     void setStatus(AudioEnum stata); 
@@ -48,20 +50,23 @@ public:
     };
 
 private:
-    std::unique_ptr<AudioOutput> output_;
+    // std::unique_ptr<IAudioOutput> output_;
 
     std::function<void(AudioEnum)> callback;
     std::function<void(double, double)> playProcessCallBack;
     std::mutex taskMutex;
+    std::mutex taskOutMutex;    // 播放锁
     std::condition_variable condition;
+    std::condition_variable _out_condition;  // 播放条件变量
     std::future<void> _thread;
+    std::future<void> _thread_out;
     bool isStoped = true;
     bool isPaused = false;
     bool waitPlay = false;
     bool waitStata= false;
     std::string file_path;
 
-    using AudioVariant = std::variant<std::unique_ptr<double>, std::unique_ptr<AudioDecoder>, std::unique_ptr<AudioOutput>>;
+    using AudioVariant = std::variant<std::unique_ptr<double>, std::unique_ptr<IAudioDecoder>, std::unique_ptr<IAudioOutput>>;
 
     class TaskObj
     {
@@ -77,8 +82,10 @@ private:
     };
     using VariantQueue = std::queue<std::unique_ptr<TaskObj>>;
     VariantQueue taskMsgQueue;
+    VariantQueue taskOutMsgQueue; // 播放 任务队列
 
-    void loop();
+    void loop();  // 解码循环
+    void loop_out(); // 播放循环
 
     AudioManager();
     ~AudioManager();

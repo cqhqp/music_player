@@ -83,7 +83,7 @@ bool Mp3Decoder::initialize(const std::string &filePath, const std::function<voi
     return true;
 }
 
-void Mp3Decoder::set_pcm_back(const std::function<void(const uint8_t*, int64_t, bool, int)> &callback)
+void Mp3Decoder::set_pcm_back(const std::function<void(const uint8_t*, int64_t, PcmFormatInfo)> &callback)
 {
     this->_u8data_back = callback;
 }
@@ -235,7 +235,18 @@ bool Mp3Decoder::decode()
                             LOG(INFO) << "linesize[0] :" << frame->linesize[0];
                             LOG(INFO) << "nb_samples:" << frame->nb_samples;
                             LOG(INFO) << "channels:" << frame->channels;
-                            _u8data_back(frame->data[0], all_data_size, true, frame->channels);
+
+                            int sample_rate = codecCtx->sample_rate;  
+                            // printf("Sample rate: %d\n", sample_rate); 
+                            PcmFormatInfo info;
+                            info.bitsSample = 32;
+                            info.channels = frame->channels;
+                            info.is_float = true;
+                            info.nb_samples = frame->nb_samples;
+                            info.planar = true;
+                            info.sample_rate = sample_rate;
+
+                            _u8data_back(frame->data[0], all_data_size, info);
                         }
                         // u8_vec_pcm = std::vector<uint8_t>(all_data_size);
                         // memcpy(&u8_vec_pcm[0], frame->data[0], all_data_size);
@@ -345,4 +356,5 @@ bool Mp3Decoder::isInitialized() const
 
 Mp3Decoder::~Mp3Decoder()
 {
+    release();
 }

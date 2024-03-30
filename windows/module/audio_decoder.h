@@ -39,24 +39,25 @@ extern "C"
   } while (0)
 
 };
+#include "pcm_format.h"
 
-class AudioDecoder
+class IAudioDecoder
 {
 public:
-    virtual ~AudioDecoder() {}
+    virtual ~IAudioDecoder() {}
     virtual bool initialize(const std::string &filePath, const std::function<void(double, double)> &callback) = 0;       // 初始化解码器
-    virtual void set_pcm_back(const std::function<void(const uint8_t*, int64_t, bool, int)> &callback) = 0;  //const std::unique_ptr<const std::vector<float>>, bool
+    virtual void set_pcm_back(const std::function<void(const uint8_t*, int64_t, PcmFormatInfo)> &callback) = 0;  //const std::unique_ptr<const std::vector<float>>, bool
     virtual void release() = 0;                                     // 初始化解码器
     virtual bool decode() = 0; // 解码数据
     virtual bool seek(double value) = 0;
     virtual bool isInitialized() const = 0;                         // 检查解码器是否已初始化
 };
 
-class Mp3Decoder : public AudioDecoder
+class Mp3Decoder : public IAudioDecoder
 {
 public:
     bool initialize(const std::string &filePath, const std::function<void(double, double)> &callback) override;
-    void set_pcm_back(const std::function<void(const uint8_t*, int64_t, bool, int)> &callback) override;  
+    void set_pcm_back(const std::function<void(const uint8_t*, int64_t, PcmFormatInfo)> &callback) override;  
     void release() override;
     bool decode() override;
     bool seek(double value) override;
@@ -66,7 +67,7 @@ private:
     const char *inFileName = nullptr;
     std::function<void(double, double)> bk;
     std::function<void(const std::unique_ptr<const std::vector<float>>, bool, int)> _data_back = nullptr;
-    std::function<void(const uint8_t*, int64_t, bool, int)> _u8data_back = nullptr;
+    std::function<void(const uint8_t*, int64_t, PcmFormatInfo)> _u8data_back = nullptr;
 
     AVFormatContext *fmtCtx =  nullptr;
     AVCodecContext *codecCtx =  nullptr;

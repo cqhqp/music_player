@@ -16,6 +16,7 @@ add_executable(${BINARY_NAME} WIN32
   "${CMAKE_SOURCE_DIR}/module/audio_metadata.cpp"
   "${CMAKE_SOURCE_DIR}/module/audio_decoder.cpp"
   "${CMAKE_SOURCE_DIR}/module/audio_cache.cpp"
+  "${CMAKE_SOURCE_DIR}/module/audio_out.cpp"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
   "Runner.rc"
   "runner.exe.manifest"
@@ -54,6 +55,8 @@ target_link_libraries(${BINARY_NAME} PRIVATE
 
 target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
+target_link_libraries(${BINARY_NAME} PRIVATE "dsound.lib")
+target_link_libraries(${BINARY_NAME} PRIVATE "MMDevApi.lib")
 target_include_directories(${BINARY_NAME} PRIVATE 
   "${CMAKE_SOURCE_DIR}"
   "${CMAKE_SOURCE_DIR}/module"

@@ -21,6 +21,7 @@ bool AudioManager::initialize(const std::function<void(AudioEnum)> &callback, co
     this->callback = callback;
     this->playProcessCallBack = playPrcessBK;
     _thread = std::async(std::launch::async, &AudioManager::loop, this);
+    _thread_out = std::async(std::launch::async, &AudioManager::loop_out, this);
     isStoped = true;
     isPaused = false;
     waitPlay = false;
@@ -38,6 +39,11 @@ AudioManager::~AudioManager()
     if (_thread.valid())
     {
         _thread.get();
+    }
+    // 等待解码线程完成
+    if (_thread_out.valid())
+    {
+        _thread_out.get();
     }
 }
 
@@ -72,14 +78,15 @@ void AudioManager::play()
     }
 
     waitStata = true;
-    std::unique_ptr<AudioDecoder> decoder_;
+    std::unique_ptr<IAudioDecoder> decoder_;
     decoder_ = std::make_unique<Mp3Decoder>();
     bool init_ok = decoder_->initialize(file_path, playProcessCallBack);
-    decoder_->set_pcm_back([](const uint8_t* data, int64_t size, bool planar, int channels)
+    decoder_->set_pcm_back([&](const uint8_t *data, int64_t size, PcmFormatInfo info)
                            {
         // std::unique_ptr<AudioDataObj> data = std::make_unique<AudioDataObj>(std::move(data_ptr), planar, channels);
         LOG(INFO) << "lambda set_pcm_back  .. add ";
-        PCMCacheManager::getInstance().add(data, size, planar, channels); });
+        PCMCacheManager::getInstance().add(data, size, info);
+        output(); });
 
     if (init_ok)
     {
@@ -95,6 +102,18 @@ void AudioManager::play()
     else
     {
         setStatus(AUDIO_STATA_STOPED);
+    }
+
+    // std::unique_ptr<IAudioOutput> output_ = std::make_unique<PCMOutput>();
+    std::unique_ptr<IAudioOutput> output_ = std::make_unique<WASAPIOutput>();
+    
+    {
+        std::unique_ptr<AudioVariant> audioVariant = std::make_unique<AudioVariant>(std::move(output_));
+        std::unique_ptr<TaskObj> taskObj = std::make_unique<TaskObj>(AUDIO_CTL_PLAY, std::move(audioVariant));
+
+        std::lock_guard<std::mutex> lock(taskOutMutex);
+        taskOutMsgQueue.push(std::move(taskObj));
+        _out_condition.notify_one(); // 通知线程
     }
 }
 void AudioManager::pause()
@@ -164,15 +183,33 @@ void AudioManager::decode()
     taskMsgQueue.push(std::move(taskObj));
     condition.notify_one(); // 通知线程
 }
+void AudioManager::output() // taskOutMutex  taskOutMsgQueue
+{
+    std::unique_ptr<TaskObj> taskObj = std::make_unique<TaskObj>(AUDIO_CTL_OUTPUT);
+    std::lock_guard<std::mutex> lock(taskOutMutex);
+    taskOutMsgQueue.push(std::move(taskObj));
+    _out_condition.notify_one();
+}
 
 void AudioManager::exit()
 {
     LOG(INFO) << "exit.";
     LOG(INFO) << "[6] exit lock.";
-    std::unique_ptr<TaskObj> taskObj = std::make_unique<TaskObj>(AUDIO_CTL_EXIT);
-    std::lock_guard<std::mutex> lock(taskMutex);
-    taskMsgQueue.push(std::move(taskObj));
-    condition.notify_one(); // 通知线程
+    {
+
+        std::unique_ptr<TaskObj> taskObj = std::make_unique<TaskObj>(AUDIO_CTL_EXIT);
+        std::lock_guard<std::mutex> lock(taskMutex);
+        taskMsgQueue.push(std::move(taskObj));
+        condition.notify_one(); // 通知线程 1
+    }
+
+    {
+        std::unique_ptr<TaskObj> taskObj = std::make_unique<TaskObj>(AUDIO_CTL_EXIT);
+        std::lock_guard<std::mutex> lock(taskOutMutex);
+        taskOutMsgQueue.push(std::move(taskObj));
+        _out_condition.notify_one(); // 通知线程 2
+    }
+
     LOG(INFO) << "[6] exit unlock.";
 }
 
@@ -225,7 +262,7 @@ void AudioManager::setStatus(AudioEnum stata)
 void AudioManager::loop()
 {
     LOG(INFO) << "loop.";
-    std::unique_ptr<AudioDecoder> decoder;
+    std::unique_ptr<IAudioDecoder> decoder;
     bool exit = false;
     std::unique_ptr<TaskObj> msgObj;
     while (!exit)
@@ -252,6 +289,7 @@ void AudioManager::loop()
                     taskMsgQueue.pop();
                 }
             }
+            PCMCacheManager::getInstance().clear(); // 音频停止，要清空 数据缓冲区
             this->callback(AUDIO_STATA_STOPED);
         }
         else if (msgObj->obj_msg == AUDIO_CTL_PLAY)
@@ -260,18 +298,18 @@ void AudioManager::loop()
             decoder = nullptr;
             std::unique_ptr<AudioVariant> obj = std::move(msgObj->obj_variant);
 
-            // 使用 std::get_if 来尝试获取 std::unique_ptr<AudioDecoder>
-            if (auto audioDecoderPtr = std::get_if<std::unique_ptr<AudioDecoder>>(obj.get()))
+            // 使用 std::get_if 来尝试获取 std::unique_ptr<IAudioDecoder>
+            if (auto audioDecoderPtr = std::get_if<std::unique_ptr<IAudioDecoder>>(obj.get()))
             {
-                // 在这里，audioDecoderPtr 是一个指向 std::unique_ptr<AudioDecoder> 的指针
+                // 在这里，audioDecoderPtr 是一个指向 std::unique_ptr<IAudioDecoder> 的指针
                 decoder = std::move(*audioDecoderPtr);
-                // 你可以通过 *audioDecoderPtr 来访问它指向的 AudioDecoder 对象
-                std::cout << "Found std::unique_ptr<AudioDecoder>!" << std::endl;
+                // 你可以通过 *audioDecoderPtr 来访问它指向的 IAudioDecoder 对象
+                std::cout << "Found std::unique_ptr<IAudioDecoder>!" << std::endl;
                 // 示例：你可以在这里对 *audioDecoderPtr 进行操作
             }
             else
             {
-                std::cout << "std::unique_ptr<AudioDecoder> not found in variant!" << std::endl;
+                std::cout << "std::unique_ptr<IAudioDecoder> not found in variant!" << std::endl;
             }
             this->callback(AUDIO_STATA_PLAYED);
             decode();
@@ -289,6 +327,7 @@ void AudioManager::loop()
                 {
                     LOG(INFO) << "AUDIO_CTL_DECODE ret:" << ret;
                     this->callback(AUDIO_STATA_STOPED);
+                    PCMCacheManager::getInstance().clear(); // 音频解码异常停止，要清空 数据缓冲区
                 }
             }
             else
@@ -309,6 +348,7 @@ void AudioManager::loop()
                         taskMsgQueue.pop();
                     }
                 }
+                PCMCacheManager::getInstance().clear(); // 音频暂停，要清空 数据缓冲区
                 this->callback(AUDIO_STATA_PAUSED);
                 // 暂停渲染。
             }
@@ -336,6 +376,7 @@ void AudioManager::loop()
                         taskMsgQueue.pop();
                     }
                 }
+                PCMCacheManager::getInstance().clear(); // 音频SEEK，要清空 数据缓冲区
 
                 std::unique_ptr<AudioVariant> obj = std::move(msgObj->obj_variant);
                 if (auto valuePtr = std::get_if<std::unique_ptr<double>>(obj.get()))
@@ -352,9 +393,89 @@ void AudioManager::loop()
                 }
                 else
                 {
-                    std::cout << "std::unique_ptr<AudioDecoder> not found in variant!" << std::endl;
+                    std::cout << "std::unique_ptr<IAudioDecoder> not found in variant!" << std::endl;
                 }
             }
+        }
+        else if (msgObj->obj_msg == AUDIO_CTL_EXIT)
+        {
+            LOG(INFO) << "AUDIO_CTL_EXIT";
+            break;
+        }
+    }
+}
+
+void AudioManager::loop_out()
+{
+    LOG(INFO) << "loop_out.";
+    std::unique_ptr<IAudioOutput> output_;
+    bool exit = false;
+    std::unique_ptr<TaskObj> msgObj;
+    bool newplay = false;
+    std::chrono::steady_clock::time_point start;
+    while (!exit)
+    {
+        { // 等待任务
+            std::unique_lock<std::mutex> lock(taskOutMutex);
+            _out_condition.wait(lock, [this]
+                                { return !taskOutMsgQueue.empty(); });
+            msgObj = std::move(taskOutMsgQueue.front());
+            taskOutMsgQueue.pop();
+        }
+
+        if (msgObj->obj_msg == AUDIO_CTL_STOP)
+        {
+        }
+        else if (msgObj->obj_msg == AUDIO_CTL_PLAY)
+        {
+            LOG(INFO) << "AUDIO_CTL_PLAY out init";
+            output_ = nullptr;
+            std::unique_ptr<AudioVariant> obj = std::move(msgObj->obj_variant);
+            if (auto pcmOutPtr = std::get_if<std::unique_ptr<IAudioOutput>>(obj.get()))
+            {
+                output_ = std::move(*pcmOutPtr);
+                newplay = true;
+                std::cout << "Found std::unique_ptr<IAudioOutput>!" << std::endl;
+            }
+            else
+            {
+                std::cout << "std::unique_ptr<IAudioOutput> not found in variant!" << std::endl;
+            }
+        }
+        else if (msgObj->obj_msg == AUDIO_CTL_OUTPUT)
+        {
+            LOG(INFO) << "AUDIO_CTL_OUTPUT";
+            if (output_)
+            {
+                // 从缓存中取出一段音频数据
+                PCMCacheManager::getInstance().get([&](uint8_t *data, int64_t size, PcmFormatInfo info)
+                                                   {
+                        if(newplay){
+                            if(!output_->isInit())
+                                output_->init(info);
+                            start = std::chrono::high_resolution_clock::now();  
+                            newplay = false;
+                        }
+
+                        output_->play(); 
+                    });
+
+                auto end = std::chrono::high_resolution_clock::now();
+                std::chrono::duration<double> elapsed = end - start;
+            }
+            else
+            {
+                LOG(ERROR) << "No output_";
+            }
+        }
+        else if (msgObj->obj_msg == AUDIO_CTL_PAUSE)
+        {
+        }
+        else if (msgObj->obj_msg == AUDIO_CTL_RESUME)
+        {
+        }
+        else if (msgObj->obj_msg == AUDIO_CTL_SEEK)
+        {
         }
         else if (msgObj->obj_msg == AUDIO_CTL_EXIT)
         {

@@ -7,30 +7,35 @@
 #include <memory>
 #include <cstdint>
 #include <queue>
-
+#include <functional>
+#include "pcm_format.h"
 class IAudioCache
 {
 public:
     virtual ~IAudioCache() {}
     virtual bool isEmpty() const = 0;
-    virtual void add(const uint8_t *data, int64_t size, bool planar, int channels) = 0;
+    virtual void clear() = 0;
+    virtual void add(const uint8_t *data, int64_t size, PcmFormatInfo info) = 0;
+    virtual void get(const std::function<void(uint8_t *, int64_t, PcmFormatInfo)> &databack) = 0;
 };
 
 class AudioDataObj
 {
 public:
-    int64_t start;
-    int64_t end;
+    // int64_t start;
+    // int64_t end;
+    uint8_t *data_ptr = nullptr;
     int64_t size;
-    bool planar;
-    int channels;
+    PcmFormatInfo info;
 };
 
 class PCMCacheManager : public IAudioCache
 {
 public:
     bool isEmpty() const;
-    void add(const uint8_t *data, int64_t size, bool planar, int channels) override;
+    void clear() override;
+    void add(const uint8_t *data, int64_t size, PcmFormatInfo info) override;
+    void get(const std::function<void(uint8_t *, int64_t, PcmFormatInfo)> &databack) override;
 
     // 提供一个公共的静态方法来获取Foo的单例对象
     static PCMCacheManager &getInstance()
