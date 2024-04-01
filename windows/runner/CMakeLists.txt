@@ -40,6 +40,7 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
 # dependencies here.
 link_directories("${CMAKE_SOURCE_DIR}/thridparty/ffmpeg/lib")  
 link_directories("${CMAKE_SOURCE_DIR}/thridparty/glog/lib")  
+link_directories("${CMAKE_SOURCE_DIR}/thridparty/glog/SDL2-2.30.1")  
 
 target_link_libraries(${BINARY_NAME} PRIVATE
   "${CMAKE_SOURCE_DIR}/thridparty/ffmpeg/lib/avcodec.lib"
@@ -51,17 +52,22 @@ target_link_libraries(${BINARY_NAME} PRIVATE
   "${CMAKE_SOURCE_DIR}/thridparty/ffmpeg/lib/swresample.lib"
   "${CMAKE_SOURCE_DIR}/thridparty/ffmpeg/lib/swscale.lib"
   "${CMAKE_SOURCE_DIR}/thridparty/glog/lib/glogd.lib"
+  "${CMAKE_SOURCE_DIR}/thridparty/SDL2-2.30.1/lib/x64/SDL2.lib"
 )
 
 target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
 target_link_libraries(${BINARY_NAME} PRIVATE "dsound.lib")
 target_link_libraries(${BINARY_NAME} PRIVATE "MMDevApi.lib")
+target_link_libraries(${BINARY_NAME} PRIVATE "xaudio2.lib")
+
+#pragma comment(lib, "xaudio2.lib")  
 target_include_directories(${BINARY_NAME} PRIVATE 
   "${CMAKE_SOURCE_DIR}"
   "${CMAKE_SOURCE_DIR}/module"
   "${CMAKE_SOURCE_DIR}/thridparty/ffmpeg/include"
   "${CMAKE_SOURCE_DIR}/thridparty/glog/include"
+  "${CMAKE_SOURCE_DIR}/thridparty/SDL2-2.30.1/include"
 )
 
 # List of absolute paths to libraries that should be bundled with the plugin

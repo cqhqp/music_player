@@ -8,6 +8,7 @@
 #include <memory>
 
 #include "win32_window.h"
+#include "audio_plugin_handle.h"
 
 // A window that does nothing but host a Flutter view.
 class FlutterWindow : public Win32Window {
@@ -43,6 +44,7 @@ class FlutterWindow : public Win32Window {
   HPOWERNOTIFY power_notification_handle_ = nullptr;
 
   HANDLE semaphore;
+  MyAudioPluginHandler handler;
 #define MAX_SEMAPHORE_COUNT 5  
 #define INITIAL_SEMAPHORE_COUNT 1  
   int message_idx = 0;

@@ -14,7 +14,6 @@
 #include <thread>
 
 #include "flutter/generated_plugin_registrant.h"
-#include "audio_plugin_handle.h"
 // #include "file_plugin_handle.h"
 // #include "logger.h"
 #include "audio_manager.h"
@@ -63,7 +62,6 @@ bool FlutterWindow::OnCreate()
   }
   RegisterPlugins(flutter_controller_->engine());
 
-  MyAudioPluginHandler handler;
   // FilePluginHandler file_handler;
   // 注册flutter函数
   flutter::MethodChannel<> channel(

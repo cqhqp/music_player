@@ -9,14 +9,22 @@
 #include <queue>
 #include <functional>
 #include "pcm_format.h"
+
+// enum AudioCacheState {
+//     AC_EMPTY    = 0,
+//     AC_FULL     = 1, ///< Round toward zero.
+//     AC_FREE     = 2,
+// };
+
 class IAudioCache
 {
 public:
     virtual ~IAudioCache() {}
     virtual bool isEmpty() const = 0;
+    virtual bool isBusy() = 0;
     virtual void clear() = 0;
-    virtual void add(const uint8_t *data, int64_t size, PcmFormatInfo info) = 0;
-    virtual void get(const std::function<void(uint8_t *, int64_t, PcmFormatInfo)> &databack) = 0;
+    virtual bool add(const uint8_t *data, int64_t size, PcmFormatInfo info) = 0;
+    virtual void get(const std::function<void(const uint8_t*, int64_t, PcmFormatInfo)> &databack) = 0;
 };
 
 class AudioDataObj
@@ -33,9 +41,10 @@ class PCMCacheManager : public IAudioCache
 {
 public:
     bool isEmpty() const;
+    bool isBusy();
     void clear() override;
-    void add(const uint8_t *data, int64_t size, PcmFormatInfo info) override;
-    void get(const std::function<void(uint8_t *, int64_t, PcmFormatInfo)> &databack) override;
+    bool add(const uint8_t *data, int64_t size, PcmFormatInfo info) override;
+    void get(const std::function<void(const uint8_t*, int64_t, PcmFormatInfo)> &databack) override;
 
     // 提供一个公共的静态方法来获取Foo的单例对象
     static PCMCacheManager &getInstance()
@@ -51,6 +60,12 @@ private:
     std::vector<uint8_t> _mem;
     int64_t reada_pos;
     int64_t write_pos;
+    uint8_t *pcm_data = nullptr;
+    int pcm_data_maxsize = 0;
+    uint8_t *tmp_pcm_data = nullptr; // 当空间不足时，保持到临时空间中，等待下次空间充足后，在使用
+    int tmp_pcm_size = 0; //  
+    int tmp_pcm_maxsize = 0; // 
+    PcmFormatInfo tmp_info;
 
     int64_t getFreeSpace() const;
 

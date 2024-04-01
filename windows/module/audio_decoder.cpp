@@ -83,7 +83,7 @@ bool Mp3Decoder::initialize(const std::string &filePath, const std::function<voi
     return true;
 }
 
-void Mp3Decoder::set_pcm_back(const std::function<void(const uint8_t*, int64_t, PcmFormatInfo)> &callback)
+void Mp3Decoder::set_pcm_back(const std::function<void(const uint8_t *, int64_t, PcmFormatInfo)> &callback)
 {
     this->_u8data_back = callback;
 }
@@ -110,6 +110,11 @@ bool Mp3Decoder::decode()
     bool dec_ret = false;
     bool dowhile = false;
     bool showdebugseek = false;
+
+    bool out_data = true;
+    int dst_linesize = 0;
+    int dst_nb_samples = 0;
+    int dst_bufsize;
     do
     {
 
@@ -154,6 +159,7 @@ bool Mp3Decoder::decode()
             }
         }
 
+        out_data = true;
         // 在这里处理数据包
         // ...
         if (pkt->stream_index == aStreamIndex)
@@ -176,7 +182,7 @@ bool Mp3Decoder::decode()
                     {
                         LOG(WARNING) << "bk sec:" << sec;
                     }
-                    this->bk(les, sec);
+                    // this->bk(les, sec);
                 }
 
                 ret = avcodec_send_packet(codecCtx, pkt);
@@ -196,6 +202,10 @@ bool Mp3Decoder::decode()
                         dec_ret = false;
                         av_packet_unref(pkt);
                         return dec_ret;
+                    }
+                    else if (ret > 0)
+                    {
+                        LOG(ERROR) << "Error avcodec_receive_frame ret:" << ret;
                     }
 
                     // 检查样本格式
@@ -230,48 +240,220 @@ bool Mp3Decoder::decode()
                             frame->linesize[0];
                             all_data_size = av_samples_get_buffer_size(
                                 &linesize, frame->channels, frame->nb_samples, (AVSampleFormat)frame->format, 0);
-                            LOG(INFO) << "all_data_size:" << all_data_size;
-                            LOG(INFO) << "linesize:" << linesize;
-                            LOG(INFO) << "linesize[0] :" << frame->linesize[0];
-                            LOG(INFO) << "nb_samples:" << frame->nb_samples;
-                            LOG(INFO) << "channels:" << frame->channels;
 
-                            int sample_rate = codecCtx->sample_rate;  
-                            // printf("Sample rate: %d\n", sample_rate); 
-                            PcmFormatInfo info;
-                            info.bitsSample = 32;
-                            info.channels = frame->channels;
-                            info.is_float = true;
-                            info.nb_samples = frame->nb_samples;
-                            info.planar = true;
-                            info.sample_rate = sample_rate;
+                            int sample_rate = codecCtx->sample_rate;
 
-                            _u8data_back(frame->data[0], all_data_size, info);
+                            if (speakerInfo.sample_rate != sample_rate ||
+                                speakerInfo.channels != frame->channels ||
+                                speakerInfo.bitsSample != 32 ||
+                                speakerInfo.is_float != true ||
+                                sample_fmt == AV_SAMPLE_FMT_FLTP) // 判断是否要重采样, 扬声器不支持平面格式
+                            {                                     // 需要重采样
+                                // LOG(INFO) << "需要重采样.";
+                                if (swr_ctx == nullptr)
+                                    init_swr();
+
+                                int src_rate = codecCtx->sample_rate;
+                                int src_nb_samples = frame->nb_samples;
+
+                                int dst_rate = speakerInfo.sample_rate;
+                                int dst_channels = speakerInfo.channels;
+                                // int ret = av_samples_alloc_array_and_samples(&dst_data, &dst_linesize, dst_channels,
+                                //                 dst_nb_samples, dst_sample_fmt, 0);
+
+                                if (!dst_data)
+                                {
+                                    max_dst_nb_samples = dst_nb_samples =
+                                        av_rescale_rnd(src_nb_samples, dst_rate, src_rate, AV_ROUND_UP);
+
+                                    ret = av_samples_alloc_array_and_samples(&dst_data, &dst_linesize, dst_channels,
+                                                                             dst_nb_samples, dst_sample_fmt, 0);
+                                    LOG(INFO) << " ret:" << ret;
+                                    LOG(INFO) << " dst_nb_samples:" << dst_nb_samples;
+                                    LOG(INFO) << " dst_linesize:" << dst_linesize;
+                                }
+                                // LOG(INFO) << "需要重采样 1.";
+                                int64_t delay = swr_get_delay(swr_ctx, src_rate);
+
+                                dst_nb_samples = av_rescale_rnd(delay + src_nb_samples, dst_rate, src_rate, AV_ROUND_UP);
+
+                                // LOG(INFO) << "dst_nb_samples:"<<dst_nb_samples;
+                                if (dst_nb_samples > max_dst_nb_samples)
+                                {
+                                    if (dst_data)
+                                    {
+                                        av_freep(&dst_data[0]);
+                                    }
+                                    ret = av_samples_alloc(dst_data, &dst_linesize, dst_channels,
+                                                           dst_nb_samples, dst_sample_fmt, 0);
+                                    if (ret < 0)
+                                    {
+                                        out_data = false;
+                                    }
+                                    else
+                                    {
+                                        max_dst_nb_samples = dst_nb_samples;
+                                    }
+                                }
+
+                                if (out_pts == 0)
+                                {
+                                    out_pts = frame->pts;
+                                }
+
+                                // 调试，输出源样本 时长所需要的pts，与前一个进行对比，判断是否计算正确
+                                {
+                                    int in_sample_rate = codecCtx->sample_rate;                                // 采样率，例如 44.1kHz
+                                    int in_num_samples = frame->nb_samples;                                    // 样本数，例如一个音频帧的样本数
+                                    double duration_seconds = (double)in_num_samples / (double)in_sample_rate; // 计算时长（秒）
+                                    // int64_t duration_microseconds = lrint(duration_seconds * 1000000.0); // 转换为微秒，并四舍五入到最近的整数  
+                                    int64_t nanosecoend = lrint(duration_seconds * 1000*1000*1000.0); // 转换为微秒，并四舍五入到最近的整数                                      
+                                    duration_seconds = duration_seconds * 1000 * 1000 * 10;                    // 当时长小于毫秒后，下面的pts无法计算，会损失精度
+                                    AVRational time_base = fmtCtx->streams[pkt->stream_index]->time_base;
+                                    // int64_t pts = av_rescale_rnd(duration_seconds * time_base.den, in_sample_rate, 1, AV_ROUND_NEAR_INF); // 将时长转换为以 AV_TIME_BASE 为单位的 PTS
+                                    int64_t pts = av_rescale_rnd(nanosecoend, time_base.den, time_base.num, AV_ROUND_ZERO); // AV_ROUND_NEAR_INF AV_ROUND_DOWN AV_ROUND_INF
+                                    pts = pts / 1000 / 1000 / 1000.0;
+                                    // LOG(INFO) << "num_samples:" << in_num_samples;
+                                    // LOG(INFO) << "duration_seconds:" << duration_seconds;
+                                    // LOG(INFO) << "time_base.den:" << time_base.den;
+                                    // LOG(INFO) << "PTS:" << pts;
+                                    // LOG(INFO) << "pre_frame_pts:" << pre_frame_pts;
+                                    // LOG(INFO) << "framep-pre_frame_pts:" << frame->pts - pre_frame_pts;
+                                    double sec_my = pts * av_q2d(fmtCtx->streams[aStreamIndex]->time_base);
+                                    double sec_src = (frame->pts - pre_frame_pts) * av_q2d(fmtCtx->streams[aStreamIndex]->time_base);
+                                    
+                                    // LOG(INFO) << "sec_my:" << sec_my;
+                                    // LOG(INFO) << "sec_src:" << sec_src;
+                                    double sec_src2 = frame->pts * av_q2d(fmtCtx->streams[aStreamIndex]->time_base);
+                                    // LOG(INFO) << "sec_src2:" << sec_src2;
+                                    // LOG(INFO) << "";
+                                    
+                                    pre_frame_pts = frame->pts;
+                                    // out_pts = out_pts - (frame->pts - pre_frame_pts);
+                                    
+                                    if (out_sec_one == 0)
+                                    {
+                                        out_sec_one = sec_src2 - sec_my;
+                                    }
+                                }
+
+#if 0
+                                // 调试，输出目标样本 时长所需要的pts
+                                {
+                                    int sample_rate = dst_rate;                                  // 采样率，例如 44.1kHz
+                                    int num_samples = dst_nb_samples;                            // 样本数，例如一个音频帧的样本数
+                                    double duration_seconds = (double)num_samples / sample_rate; // 计算时长（秒）
+                                    duration_seconds = duration_seconds * 1000 * 1000 * 1000;    // 当时长小于毫秒后，下面的pts无法计算，会损失精度
+                                    AVRational time_base = fmtCtx->streams[pkt->stream_index]->time_base;
+                                    // int64_t pts = av_rescale_rnd(duration_seconds * time_base.den, sample_rate, 1, AV_ROUND_NEAR_INF); // 将时长转换为以 AV_TIME_BASE 为单位的 PTS
+                                    int64_t pts = av_rescale_rnd(duration_seconds, time_base.den, time_base.num, AV_ROUND_NEAR_INF);
+                                    pts = pts / 1000 / 1000 / 1000;
+                                    out_pts = out_pts + pts;
+                                    LOG(INFO) << "num_samples:" << num_samples;
+                                    LOG(INFO) << "PTS:" << pts;
+                                    LOG(INFO) << "out_pts:" << out_pts;
+                                    double sec_src = out_pts * av_q2d(fmtCtx->streams[aStreamIndex]->time_base);
+                                    LOG(INFO) << "sec_src:" << sec_src;
+                                    LOG(INFO) << "";
+                                }
+#endif
+                                // double sec = frame->pts * av_q2d(fmtCtx->streams[aStreamIndex]->time_base);
+                                // LOG(INFO) << "sec:"<<sec;
+                                // double new_sec = out_pts * av_q2d(fmtCtx->streams[aStreamIndex]->time_base);
+                                // LOG(INFO) << "new_sec:"<<new_sec;
+                                double sec_out = 0.0;
+                                // LOG(INFO) << "需要重采样 2.";
+                                /* convert to destination format */
+                                ret = swr_convert(swr_ctx, dst_data, dst_nb_samples, (const uint8_t **)&frame->data[0], src_nb_samples);
+                                if (ret < 0)
+                                {
+                                    fprintf(stderr, "Error while converting\n");
+                                    out_data = false;
+                                }
+                                else
+                                {
+#if 1
+                                    {
+
+                                        // if (out_sec == 0)
+                                        // {
+                                        //     out_pts = frame->pts;
+                                        // }
+                                        // 调试，输出目标样本 时长所需要的pts
+                                        {
+                                            // LOG(INFO) << ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>";
+                                            int sample_rate = dst_rate;                                  // 采样率，例如 44.1kHz
+                                            int num_samples = ret;                            // 样本数，例如一个音频帧的样本数
+                                            double duration_seconds = (double)num_samples / sample_rate; // 计算时长（秒）
+                                            int64_t duration_nanosecoend = lrint(duration_seconds * 1000*1000*1000.0); // 转换为微秒，并四舍五入到最近的整数  
+                                            AVRational time_base = fmtCtx->streams[pkt->stream_index]->time_base;
+
+                                            // int64_t pts_diff = av_rescale_rnd(duration_nanosecoend, time_base.den, time_base.num, AV_ROUND_NEAR_INF);
+                                            // out_pts += pts_diff/1000/1000/1000.0; // 累加计算出的pts到out_pts
+                                            int64_t pts_in_nanoseconds = ((double)num_samples / sample_rate) * 1000*1000*1000;
+                                            out_pts += pts_in_nanoseconds;
+                                            // LOG(INFO) << "PTS diff:" << pts_diff;
+                                            // LOG(INFO) << "Cumulative pts_in_nanoseconds:" << pts_in_nanoseconds;
+                                            double sec_ = out_sec_one + out_pts * av_q2d({1,1000*1000*1000});
+                                            sec_out = sec_;
+                                            // LOG(INFO) << "sec_src:" << sec_src;
+                                            // LOG(INFO) << "";
+                                            // LOG(INFO) << "....................................................";
+                                        }
+                                    }
+#endif
+                                    // LOG(INFO) << "需要重采样 3.";
+                                    dst_bufsize = av_samples_get_buffer_size(&dst_linesize, dst_channels, ret, dst_sample_fmt, 0);
+                                    PcmFormatInfo info;
+                                    info.bitsSample = speakerInfo.bitsSample;
+                                    info.channels = dst_channels;
+                                    info.is_float = speakerInfo.is_float;
+                                    info.nb_samples = ret;
+                                    info.planar = false;
+                                    info.sample_rate = dst_rate;
+                                    info.time_sec = sec_out;
+                                    info.max_time_sec = les;
+
+                                    // LOG(INFO) << " - debug - pcm_data 000";
+                                    if (data_dst_size < dst_bufsize)
+                                    {
+                                        LOG(INFO) << "dst_bufsize:" << dst_bufsize;
+                                        LOG(INFO) << "dst_linesize:" << dst_linesize;
+                                        LOG(INFO) << "nb_samples:" << ret;
+                                        LOG(INFO) << "channels:" << dst_channels;
+                                        // LOG(INFO) << "pcm_data size init.";
+                                        if (data_dst != nullptr)
+                                        {
+                                            free(data_dst);
+                                            data_dst = nullptr;
+                                        }
+                                        data_dst = (uint8_t *)malloc(sizeof(uint8_t) * dst_bufsize);
+                                        data_dst_size = dst_bufsize;
+                                    }
+                                    // uint8_t* data_dst = pcm_data->data();
+                                    // uint8_t* data_dst = (uint8_t* )malloc(sizeof(uint8_t) * all_data_size);
+                                    if (data_dst != nullptr && frame->data[0] != nullptr)
+                                    {
+                                        // LOG(INFO) << "memcpy.";
+                                        // LOG(INFO) << "pcm_data->size:" << data_dst_size;
+                                        memcpy(data_dst, frame->data[0], dst_bufsize);
+                                        // LOG(INFO) << " - debug - _u8data_back before";
+                                        _u8data_back(data_dst, dst_bufsize, info);
+                                    }
+                                    else
+                                    {
+                                        LOG(ERROR) << "ERROR:Either pcm_data or frame->data[0] is null. ...............";
+                                    }
+                                }
+                            }
+                            // printf("Sample rate: %d\n", sample_rate);
                         }
-                        // u8_vec_pcm = std::vector<uint8_t>(all_data_size);
-                        // memcpy(&u8_vec_pcm[0], frame->data[0], all_data_size);
-                        // {
-                        //     // 创建一个 float 类型的 vector，其大小与 uint8_t vector 相同
-                        //     std::vector<float> vec_float(u8_vec_pcm.size());
-                        //     // 使用 std::transform 将 uint8_t 转换为 float
-                        //     // 这里假设简单的类型转换即可，但你可能需要更复杂的转换逻辑
-                        //     std::transform(u8_vec_pcm.begin(), u8_vec_pcm.end(), vec_float.begin(),
-                        //                    [](uint8_t val)
-                        //                    { return static_cast<float>(val); });
-                        //     // 创建一个指向 const std::vector<float> 的 unique_ptr
-                        //     std::unique_ptr<const std::vector<float>> vecPtr =
-                        //         std::make_unique<const std::vector<float>>(vec_float);
-                        //     if (_data_back)
-                        //     {
-                        //         _data_back(std::move(vecPtr), true, frame->channels);
-                        //     }
-                        // }
                         break;
                     // ... 其他格式 ...
                     default:
                         fmt_str = "Unknown";
                     }
-                    LOG(INFO) << "Audio is " << fmt_str;
+                    // LOG(INFO) << "Audio is " << fmt_str;
                 }
             }
         }
@@ -279,54 +461,8 @@ bool Mp3Decoder::decode()
 
         // 释放数据包
         av_packet_unref(pkt);
+        // LOG(INFO) << "av_packet_unref ..";
     } while (dowhile);
-
-    // if(pkt->stream_index== aStreamIndex){
-    //     ret = avcodec_send_packet(codecCtx, pkt);
-    //     if(ret <0){
-    //         LOG(ERROR) << "Error: avcodec_send_packet failed.";
-    //     }
-    //     LOG(INFO) << "pkt->dts:" << pkt->dts;
-    //     LOG(INFO) << "pkt->pts:" << pkt->pts;
-    //     {
-    //         char timeStr[AV_TS_MAX_STRING_SIZE] = {0};
-    //         av_ts_make_time_string(timeStr, (int64_t)pkt->pts, &codecCtx->time_base);
-    //         LOG(INFO) << "pkt->pts time1::" << timeStr;
-    //     }
-    //     /* read all the output frames (in general there may be any number of them */
-    //     while (ret >= 0) {
-    //         ret = avcodec_receive_frame(codecCtx, frame);
-    //         if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF){
-    //             LOG(INFO) << "End one frame.";
-    //             break;
-    //         }
-    //         else if (ret < 0) {
-    //             LOG(ERROR) << "Error: avcodec_receiveframe during decoding.";
-    //             exit(1);
-    //         }
-    //         int linesize = 0;
-    //         // int sample_size = av_get_bytes_per_sample(codecCtx->sample_fmt);
-    //         int t_data_size = av_samples_get_buffer_size(
-    //                 &linesize, 1, frame->nb_samples, (AVSampleFormat)frame->format, 0);
-    //         if (t_data_size < 0) {
-    //             /* This should not occur, checking just for paranoia */
-    //             LOG(ERROR) << "Failed to calculate data size.";
-    //             return;
-    //         }else{
-    //             LOG(INFO) << "data_size:" << t_data_size;
-    //             LOG(INFO) << "frame->pts:" << frame->pts;
-    //             double time1 = frame->pts * av_q2d(frame->time_base);
-    //             double time2 = frame->pts * av_q2d(codecCtx->time_base);
-    //             char timeStr[AV_TS_MAX_STRING_SIZE] = {0};
-    //             av_ts_make_time_string(timeStr, (int64_t)frame->pts, &codecCtx->time_base);
-    //             char *time3 = timeStr;
-    //             LOG(INFO) << "time1::" << time1 <<"  time2:" << time3;
-    //         }
-    //         // for (i = 0; i < frame->nb_samples; i++)
-    //         //     for (ch = 0; ch < codecCtx->channels; ch++)
-    //         //         fwrite(frame->data[ch] + data_size*i, 1, data_size, outfile);
-    //     }
-    // }
     return dec_ret;
 }
 
@@ -346,6 +482,11 @@ bool Mp3Decoder::seek(double value)
     {
         // 处理错误
     }
+    else
+    {
+        out_pts = 0; // seek 重采样的时间需要重新 算
+        out_sec_one = 0;
+    }
     return false;
 }
 
@@ -354,7 +495,55 @@ bool Mp3Decoder::isInitialized() const
     return false;
 }
 
+void Mp3Decoder::setSpeakerInfo(PcmFormatInfo info)
+{
+    speakerInfo = info;
+}
+
+Mp3Decoder::Mp3Decoder()
+{
+}
+
 Mp3Decoder::~Mp3Decoder()
 {
+    if (data_dst != nullptr)
+    {
+        free(data_dst);
+        data_dst = nullptr;
+    }
     release();
+}
+
+void Mp3Decoder::init_swr()
+{
+    // LOG(INFO) << "init_swr 1.";
+    int output_sample_rate = speakerInfo.sample_rate;
+    int64_t out_ch_layout = speakerInfo.channels == 2 ? AV_CH_LAYOUT_STEREO : AV_CH_LAYOUT_MONO;
+    // dst_sample_fmt = speakerInfo.bitsSample == 16 ? AV_SAMPLE_FMT_S16 : AV_SAMPLE_FMT_U8;
+    switch (speakerInfo.bitsSample)
+    {
+    case 8:
+        dst_sample_fmt = AV_SAMPLE_FMT_U8;
+        break;
+    case 16:
+        dst_sample_fmt = AV_SAMPLE_FMT_S16;
+        break;
+    case 32:
+        dst_sample_fmt = AV_SAMPLE_FMT_S32;
+        break;
+    default:
+        break;
+    }
+    // LOG(INFO) << "init_swr 2.";
+    if (speakerInfo.is_float)
+    {
+        dst_sample_fmt = AV_SAMPLE_FMT_FLT;
+    }
+
+    // LOG(INFO) << "init_swr 3.";
+    swr_ctx = swr_alloc_set_opts(NULL, out_ch_layout, dst_sample_fmt, output_sample_rate,
+                                 codecCtx->channel_layout, (AVSampleFormat)codecCtx->sample_fmt, codecCtx->sample_rate, 0, NULL);
+
+    // LOG(INFO) << "init_swr 4.";
+    swr_init(swr_ctx);
 }

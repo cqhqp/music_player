@@ -65,6 +65,11 @@ private:
     bool waitPlay = false;
     bool waitStata= false;
     std::string file_path;
+    PcmFormatInfo speakerInfo;
+    double start_pcm_sec = 0.0; 
+    double new_pcm_sec = 0.0; 
+    std::atomic<bool> out_pause;
+    std::atomic<bool> out_stop;
 
     using AudioVariant = std::variant<std::unique_ptr<double>, std::unique_ptr<IAudioDecoder>, std::unique_ptr<IAudioOutput>>;
 
