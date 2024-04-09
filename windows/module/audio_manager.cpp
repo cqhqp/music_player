@@ -483,13 +483,19 @@ void AudioManager::loop_out()
             if (out_stop)
             {
                 LOG(INFO) << " >>>> loop_out out_stop ";
+                if(output_)
+                    output_->pause();
                 std::unique_lock<std::mutex> lock(taskOutMutex);
                 _out_condition.wait(lock, [this]
                                     { return !out_stop; });
+
+                    
             }
             if (out_pause)
             {
                 LOG(INFO) << " >>>> loop_out out_pause ";
+                if(output_)
+                    output_->pause();
                 std::unique_lock<std::mutex> lock(taskOutMutex);
                 _out_condition.wait(lock, [this]
                                     { return !out_pause; });
@@ -546,12 +552,11 @@ void AudioManager::loop_out()
                     {
                         duration_sec = new_pcm_sec - start_pcm_sec;
                     }
-                    // LOG(INFO) << "info new_pcm_sec:" << new_pcm_sec;
-                    // LOG(INFO) << "";
-                    // LOG(INFO) << "duration_clock:" << duration_clock;
-                    // LOG(INFO) << "duration_sec:" << duration_sec;
-                    if ((duration_sec - duration_clock) < 0.1523)
+                    if ((duration_sec - duration_clock) < 0.5523)
                     {
+                        // LOG(INFO) << "duration_clock:" << duration_clock;
+                        // LOG(INFO) << "duration_sec:" << duration_sec << "   new_pcm_sec("<< new_pcm_sec<<")" << " - start_pcm_sec("<< start_pcm_sec <<")";
+                        // LOG(INFO) << "";
                         can_speaker = true;
                     }
                 }

@@ -30,23 +30,23 @@ std::string GetExecutableDirectory() {
         fs::path fullPath(buffer);  
         return fullPath.parent_path().string();  
     }  
-    return ""; // Èç¹ûÊ§°Ü£¬·µ»Ø¿Õ×Ö·û´®  
+    return ""; // å¦‚æœå¤±è´¥ï¼Œè¿”å›ç©ºå­—ç¬¦ä¸²  
 }  
 
 MyAudioPluginHandler::MyAudioPluginHandler()
 {
   google::InitGoogleLogging("test");
 
-  // ÉèÖÃÈÕÖ¾Êä³öÄ¿Â¼
+  // è®¾ç½®æ—¥å¿—è¾“å‡ºç›®å½•
   FLAGS_log_dir = "./logs";
 
   std::string dir = GetExecutableDirectory();  
   std::string home = dir+"/logs/";
 
-    // ÉèÖÃÈÕÖ¾¼¶±ğ  
-  FLAGS_alsologtostderr = true; // ÉèÖÃÈÕÖ¾ÏûÏ¢³ıÁËÈÕÖ¾ÎÄ¼şÖ®ÍâÊÇ·ñÈ¥±ê×¼Êä³ö
-  FLAGS_max_log_size = 10; // ÉèÖÃ×î´óÈÕÖ¾ÎÄ¼ş´óĞ¡£¨ÒÔMBÎªµ¥Î»£©
-  FLAGS_stop_logging_if_full_disk = true; // ÉèÖÃÊÇ·ñÔÚ´ÅÅÌÒÑÂúÊ±±ÜÃâÈÕÖ¾¼ÇÂ¼µ½´ÅÅÌ
+    // è®¾ç½®æ—¥å¿—çº§åˆ«  
+  FLAGS_alsologtostderr = true; // è®¾ç½®æ—¥å¿—æ¶ˆæ¯é™¤äº†æ—¥å¿—æ–‡ä»¶ä¹‹å¤–æ˜¯å¦å»æ ‡å‡†è¾“å‡º
+  FLAGS_max_log_size = 10; // è®¾ç½®æœ€å¤§æ—¥å¿—æ–‡ä»¶å¤§å°ï¼ˆä»¥MBä¸ºå•ä½ï¼‰
+  FLAGS_stop_logging_if_full_disk = true; // è®¾ç½®æ˜¯å¦åœ¨ç£ç›˜å·²æ»¡æ—¶é¿å…æ—¥å¿—è®°å½•åˆ°ç£ç›˜
 
   // FLAGS_minloglevel = google::GLOG_WARNING;
   FLAGS_minloglevel = google::GLOG_INFO;
@@ -59,8 +59,8 @@ MyAudioPluginHandler::MyAudioPluginHandler()
   std::string f_log = home+"f_";
   google::SetLogDestination(google::GLOG_FATAL, f_log.c_str());
 
-  LOG(INFO) << "Hello, GOOGLE!";  // INFO ¼¶±ğµÄÈÕÖ¾
-  LOG(WARNING) << "Hello, GOOGLE! warning test";  // »áÊä³öÒ»¸öWarningÈÕÖ¾  
+  LOG(INFO) << "Hello, GOOGLE!";  // INFO çº§åˆ«çš„æ—¥å¿—
+  LOG(WARNING) << "Hello, GOOGLE! warning test";  // ä¼šè¾“å‡ºä¸€ä¸ªWarningæ—¥å¿—  
   LOG(ERROR) << "Hello, GOOGLE! This should work";
 }
 
@@ -106,7 +106,7 @@ void MyAudioPluginHandler::HandlePlay(const flutter::EncodableValue *param, std:
     std::map<flutter::EncodableValue, flutter::EncodableValue> res = flutter::EncodableMap{};
 
     AudioManager::getInstance().metadata(file_path, [&res](std::string key, std::string value){
-        res[flutter::EncodableValue(key)] = flutter::EncodableValue(value); // ²åÈëmapÊ§°Ü
+        res[flutter::EncodableValue(key)] = flutter::EncodableValue(value); // æ’å…¥mapå¤±è´¥
     });
 
     for (auto it : res)
@@ -129,7 +129,7 @@ void MyAudioPluginHandler::HandlePlay(const flutter::EncodableValue *param, std:
     return;
   }
 
-  // ÊµÏÖ²¥·ÅÒôÆµµÄÂß¼­
+  // å®ç°æ’­æ”¾éŸ³é¢‘çš„é€»è¾‘
   // ...
 }
 
@@ -137,7 +137,7 @@ void MyAudioPluginHandler::HandlePause(const flutter::EncodableValue *param, std
 {
   std::cout << " ... HandlePause ...!" << std::endl;
   AudioManager::getInstance().pause();
-  // ÊµÏÖÔİÍ£ÒôÆµµÄÂß¼­
+  // å®ç°æš‚åœéŸ³é¢‘çš„é€»è¾‘
   // ...
   result->Success(true);
 }
@@ -199,4 +199,4 @@ void MyAudioPluginHandler::HandleSeek(const flutter::EncodableValue *param, std:
   AudioManager::getInstance().seek(value);
   result->Success(true);
 }
-// Ìí¼ÓÆäËû·½·¨´¦Àíº¯Êı...
+// æ·»åŠ å…¶ä»–æ–¹æ³•å¤„ç†å‡½æ•°...

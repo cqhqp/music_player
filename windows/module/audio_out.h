@@ -92,6 +92,10 @@ struct PcmObj: PcmFormatInfo
     int64_t data_size = 0;
 };
 
+#include <future>
+#include <queue>
+#include <mutex>
+#include <variant>
 class SDL2Speaker : public IAudioOutput
 {
 public:
@@ -116,6 +120,7 @@ private:
     // PcmObj tmp_obj; //存放未用完的数据
     uint8_t *tmp_mem = nullptr;
     size_t   tmp_mem_size = 0;
+    std::chrono::steady_clock::time_point pre_clock;
 
 };
 

@@ -17,7 +17,7 @@ extern "C"
 #include <libavutil/timestamp.h>
 #include <libavutil/imgutils.h>
 #include <libavutil/samplefmt.h>
-#include <libswresample/swresample.h>  
+#include <libswresample/swresample.h>
 
 #define my_av_ts2str(ts)                                                                     \
   do                                                                                         \
@@ -39,6 +39,9 @@ extern "C"
   } while (0)
 };
 #include "pcm_format.h"
+#include <fstream>
+#include <iostream>
+#include <vector>
 
 class IAudioDecoder
 {
@@ -50,7 +53,7 @@ public:
   virtual bool decode() = 0;                                                                                     // 解码数据
   virtual bool seek(double value) = 0;
   virtual bool isInitialized() const = 0; // 检查解码器是否已初始化
-  virtual void setSpeakerInfo(PcmFormatInfo info) = 0; 
+  virtual void setSpeakerInfo(PcmFormatInfo info) = 0;
 };
 
 class Mp3Decoder : public IAudioDecoder
@@ -79,24 +82,37 @@ private:
   int aStreamIndex = -1;
   int64_t seek_time = 0;
   double seek_dec = 0;
-   
+
   PcmFormatInfo speakerInfo;
 
   // 重采样
-  SwrContext *swr_ctx = nullptr;  
+  SwrContext *swr_ctx = nullptr;
   AVSampleFormat dst_sample_fmt;
+  // 音频数据
   uint8_t **dst_data = nullptr;
+
+  AVFrame *output_frame = nullptr;
+  int dst_nb_samples = 0;
   int max_dst_nb_samples = 0;
   int64_t out_pts = 0;
+  int64_t pre_pts_diff = 0;// 前一帧音频占用的长度pts
   double out_sec_one = 0;
   int64_t pre_pts = 0;
   int64_t pre_frame_pts = 0;
 
-  // std::shared_ptr<std::vector<uint8_t>> pcm_data = std::make_shared<std::vector<uint8_t>>();
-   uint8_t* data_dst= nullptr;
-   int data_dst_size = 0;
+  int dst_linesize = 0;
+  int dst_bufsize = 0;
 
-   void init_swr();
+  // std::shared_ptr<std::vector<uint8_t>> pcm_data = std::make_shared<std::vector<uint8_t>>();
+  uint8_t *data_dst = nullptr;
+  int data_dst_size = 0;
+
+  std::unique_ptr<std::ofstream> outfile; // 调试输出pcm
+  int debug_src_out_idx = 0;
+  int debug_src_nb_samples = 0;
+  int debug_dst_nb_samples = 0;
+
+  void init_swr();
 };
 
 #endif // DECODER_H

@@ -780,6 +780,7 @@ void SDL2Speaker::pause()
 void SDL2Speaker::add_pcm(const uint8_t *data, int64_t size, PcmFormatInfo info)
 {
     std::unique_ptr<PcmObj> obj_ptr = nullptr;
+    // LOG(ERROR) << "add_pcm size :" << size; 
 
     if (!free_queue.empty())
     {
@@ -828,7 +829,7 @@ bool SDL2Speaker::init(PcmFormatInfo info)
 
         if (speak_pcm_info.bitsSample == 8)
         {
-            want.format = AUDIO_S8;
+            want.format = AUDIO_U8;
         }
         if (speak_pcm_info.bitsSample == 16)
         {
@@ -844,7 +845,11 @@ bool SDL2Speaker::init(PcmFormatInfo info)
         }
     }
     want.channels = speak_pcm_info.channels;
-    want.samples = 1254; // 每次回调的样本数
+    want.samples = 1024; // 每次回调的样本数
+    // want.size = 2048*2*2;
+    
+
+    pre_clock = std::chrono::high_resolution_clock::now();  
     want.callback = [](void *userdata, Uint8 *stream, int len)
     {
         SDL2Speaker *context = (SDL2Speaker *)userdata;
@@ -853,6 +858,21 @@ bool SDL2Speaker::init(PcmFormatInfo info)
         // PcmObj **tmp_obj = &context->tmp_obj;
         // 清除输出缓冲区
         memset(stream, 0, len);
+        
+        {
+            // 调试 
+            // 1、每次回调得时间差
+            // 2、回调得len
+            // 3、计算样本数
+            double duration_clock = 0;
+            {
+                auto end = std::chrono::high_resolution_clock::now();
+                std::chrono::duration<double> elapsed = end - context->pre_clock;
+                duration_clock = elapsed.count();
+            }
+            // LOG(ERROR) << "duration_clock :" << duration_clock; 
+            // LOG(ERROR) << "len :" << len; 
+        }
 
         // 填充输出缓冲区，直到没有更多的数据或缓冲区已满
         while (len > 0 && !audio_queue.empty())
@@ -900,15 +920,28 @@ bool SDL2Speaker::init(PcmFormatInfo info)
                 }
             }
         }
+        // LOG(ERROR) << "len 2:" << len; 
+        context->pre_clock = std::chrono::high_resolution_clock::now();  
     };
     want.userdata = this;
 
+    
+    if (SDL_OpenAudio(&want,NULL) < 0)
+    {
+        printf("fail to open audio\n");
+        return -1;
+    }
     // 打开音频设备
     if (!(dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, SDL_AUDIO_ALLOW_ANY_CHANGE)))
     {
         SDL_Quit();
         return false;
     }
+    LOG(INFO) << "SDL freq: " << have.freq;
+    LOG(INFO) << "SDL format: " << have.format; // AUDIO_F32LSB
+    LOG(INFO) << "SDL channels: " << have.channels;
+    LOG(INFO) << "SDL size: " << have.size;
+    LOG(INFO) << "SDL samples: " << have.samples;
     init_flag = true;
     return true;
 }
@@ -936,16 +969,16 @@ void SDL2Speaker::getDefaultFormat(const std::function<void(PcmFormatInfo)> &dat
         return;
     }
 
-    // 输出音频设备的参数
-    LOG(INFO) << "Audio device supports:";
-    // LOG(INFO) << "  Name: " << spec.name;
-    LOG(INFO) << "  Format: " << spec.format; //    Signed 16-bit samples */ // AUDIO_S16LSB
-    LOG(INFO) << "  Frequency: " << spec.freq << " Hz";
-    LOG(INFO) << "  Channels: " << spec.channels;
-    LOG(INFO) << "  Samples: " << spec.samples;
-    LOG(INFO) << "  Silence: " << spec.silence;
-    LOG(INFO) << "  Padding: " << spec.padding;
-    LOG(INFO) << "  Size: " << spec.size << " bytes";
+    // // 输出音频设备的参数
+    // LOG(INFO) << "Audio device supports:";
+    // // LOG(INFO) << "  Name: " << spec.name;
+    // LOG(INFO) << "  Format: " << spec.format; //    Signed 16-bit samples */ // AUDIO_S16LSB
+    // LOG(INFO) << "  Frequency: " << spec.freq << " Hz";
+    // LOG(INFO) << "  Channels: " << spec.channels;
+    // LOG(INFO) << "  Samples: " << spec.samples;
+    // LOG(INFO) << "  Silence: " << spec.silence;
+    // LOG(INFO) << "  Padding: " << spec.padding;
+    // LOG(INFO) << "  Size: " << spec.size << " bytes";
 
     // 清理SDL
     SDL_Quit();
@@ -975,9 +1008,11 @@ void SDL2Speaker::getDefaultFormat(const std::function<void(PcmFormatInfo)> &dat
     }
 
     { // 写死进行调试
-    info.bitsSample = 32;
-    info.is_float = true;
-    info.channels = 2;
+    // info.bitsSample = 8;
+    // info.channels = 1;
+        info.bitsSample = 32;
+        info.is_float = true;
+        info.channels = 2;
 
     }
 
