@@ -26,65 +26,6 @@ public:
 
 };
 
-class PCMOutput : public IAudioOutput
-{
-public:
-    PCMOutput();
-    ~PCMOutput();
-    void play() override;
-    bool init(PcmFormatInfo info) override;
-    bool isInit() const;
-
-private:
-    // LPDIRECTSOUNDBUFFER pDSBuffer = nullptr;
-    bool init_flag = false;
-};
-
-class WASAPIOutput : public IAudioOutput
-{
-public:
-    WASAPIOutput();
-    ~WASAPIOutput();
-    void play() override;
-    bool init(PcmFormatInfo info) override;
-    bool isInit() const;
-    void init_format() override;
-
-private:
-    // LPDIRECTSOUNDBUFFER pDSBuffer = nullptr;
-    bool init_flag = false;
-};
-
-class CoreSpeaker : public IAudioOutput
-{
-public:
-    CoreSpeaker();
-    ~CoreSpeaker();
-    void play() override;
-    bool init(PcmFormatInfo info) override;
-    bool isInit() const;
-    void EnumerateAudioOutputDevices();
-    void GetDefaultAudioOutputDeviceID();
-
-private:
-    // LPDIRECTSOUNDBUFFER pDSBuffer = nullptr;
-    bool init_flag = false;
-};
-
-class XAudio2Speaker : public IAudioOutput
-{
-public:
-    XAudio2Speaker();
-    ~XAudio2Speaker();
-    void play() override;
-    bool init(PcmFormatInfo info) override;
-    bool isInit() const;
-
-private:
-    // LPDIRECTSOUNDBUFFER pDSBuffer = nullptr;
-    bool init_flag = false;
-};
-
 struct PcmObj: PcmFormatInfo
 {
     uint8_t *mem = nullptr;

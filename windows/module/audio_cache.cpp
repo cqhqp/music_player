@@ -8,8 +8,10 @@ PCMCacheManager PCMCacheManager::Singleton::instance; // 静态成员 instance �
 
 PCMCacheManager::PCMCacheManager()
 {
-    _mem = std::vector<uint8_t>(1024 * 1024 * 10);
+    // _mem = std::vector<uint8_t>(1024 * 1024 * 1);
+    _mem = std::vector<uint8_t>(128 * 1024 * 1);
     reada_pos = write_pos = 0;
+    obj_idx = 0;
 };
 
 PCMCacheManager::~PCMCacheManager()
@@ -18,7 +20,6 @@ PCMCacheManager::~PCMCacheManager()
         free(pcm_data);
         pcm_data = nullptr;
     }
-    std::unique_lock<std::mutex> lock(mutex_);
     cvNotEmpty_.notify_all();
 }
 
@@ -29,8 +30,13 @@ bool PCMCacheManager::isEmpty() const
 
 bool PCMCacheManager::isBusy() 
 {
+    if((audio_pcm_total_size + tmp_pcm_size) > _mem.size()){
+        return true;
+    }
     int free_space = getFreeSpace();
     if(tmp_pcm_size != 0 && free_space > _mem.size()/2){ 
+        LOG(INFO) << " isBusy ..... free_space:" << free_space;
+        
         // 如果有临时数据，等待缓存空间释放出1半的时候，在存储，减少处理次数
         add(tmp_pcm_data, tmp_pcm_size, tmp_info);
         tmp_pcm_size = 0;
@@ -40,7 +46,6 @@ bool PCMCacheManager::isBusy()
 
 void PCMCacheManager::clear()
 {
-    std::unique_lock<std::mutex> lock(mutex_);
     while (!_pcmQueue.empty())
     {
         _pcmQueue.pop();
@@ -53,8 +58,12 @@ int64_t PCMCacheManager::getFreeSpace() const
 {
     int64_t used_space, free_space;
     // 计算已使用空间
-    if (write_pos >= reada_pos)
+    if (write_pos >= reada_pos){
         used_space = write_pos - reada_pos;
+        if(write_pos == reada_pos){
+            used_space = audio_pcm_total_size;
+        }
+    }
     else
         used_space = (_mem.size() - reada_pos) + write_pos;
 
@@ -66,59 +75,62 @@ int64_t PCMCacheManager::getFreeSpace() const
 
 bool PCMCacheManager::add(const uint8_t *data, int64_t size, PcmFormatInfo info)
 {
-    // if(tmp_pcm_size != 0){ 
-    //     // 如果有临时数据，等待缓存空间释放出1半的时候，在存储，减少处理次数
-    //     add(tmp_pcm_data, tmp_pcm_size, tmp_info);
-    //     tmp_pcm_size = 0;
-    // }
-
-    // LOG(INFO) << "add";
-    std::unique_lock<std::mutex> lock(mutex_);
-
     int64_t free_space = getFreeSpace();
-    // LOG(INFO) << "free:" << free / 1024 << " KB";
-
     size_t free_end_ = _mem.size() - write_pos;
-    // LOG(INFO) << "free_end_:" << free_end_ << " B";
+    // LOG(INFO) << "free_space:" << free_space << "   free_end_:" << free_end_ ;
 
     // 尾部空间不足, 需要 去除尾部空间，重新计算可用空间
-    if (free_end_ < size)
+    if (free_space >= size && free_end_ < size)
     {
-        free_space = free_space - free_end_;
+        // LOG(INFO) << "reada_pos:" << reada_pos << "  write_pos:" << write_pos << "   _mem:"<<_mem.size();
+        // LOG(INFO) << "free_space:" << free_space;
+
+        // free_space = free_space - free_end_;
+        // 尾部空间不够存入当前数据，用空对象占位
+        write_pos = 0;
+        // LOG(INFO) << "reada_pos:" << reada_pos << "  write_pos:" << write_pos << "   _mem:"<<_mem.size();
+        std::unique_ptr<AudioDataObj> dataObj = std::make_unique<AudioDataObj>();
+        dataObj->size = free_end_;
+        audio_pcm_total_size += free_end_;
+        // LOG(INFO) << "push 0    audio_pcm_total_size: " << audio_pcm_total_size;
+        _pcmQueue.push(std::move(dataObj));
+        // LOG(INFO) << "free cpy...";
+        free_space = getFreeSpace();
     }
 
     // 空余空间能存放数据
     if (free_space >= size)
     {
-        if (free_end_ < size)
-        {
-            write_pos = 0;
-            std::unique_ptr<AudioDataObj> dataObj = std::make_unique<AudioDataObj>();
-            dataObj->size = free_end_;
-            _pcmQueue.push(std::move(dataObj));
-        }
-        // LOG(INFO) << "free cpy...";
-
+        // LOG(INFO) << "reada_pos:" << reada_pos << "  write_pos:" << write_pos << "   _mem:"<<_mem.size();
+        // LOG(INFO) << "free_space:" << free_space;
         uint8_t *data_ptr = &_mem[write_pos];        
         const uint8_t* data_src = data; 
+        
         if (data_src != nullptr && data_ptr != nullptr)
         {
             memcpy(data_ptr, data_src, size);
-
-            write_pos += size;
-            // LOG(INFO) << "write_pos:" << write_pos;
+            // LOG(INFO) << "reada_pos:" << reada_pos << "  write_pos:" << write_pos << "   _mem:"<<_mem.size();
 
             // _pcmQueue
             std::unique_ptr<AudioDataObj> dataObj = std::make_unique<AudioDataObj>();
             dataObj->data_ptr = data_ptr;
             dataObj->size = size;
             dataObj->info = info;
+            dataObj->idx = obj_idx;
+            dataObj->start_post = write_pos;
+            obj_idx++;
+            audio_pcm_total_size += size;
+            // LOG(INFO) << "push 1    audio_pcm_total_size: " << audio_pcm_total_size;
+            // LOG(INFO) <<" idx:" <<dataObj->idx << "  dataObj->info time_sec:"<< dataObj->info.time_sec;
             _pcmQueue.push(std::move(dataObj));
+
+            write_pos += size;
         }
         else
         {
             LOG(ERROR) << "pcm data_src is null";
         }
+        
         return true;
     }
     else
@@ -135,6 +147,7 @@ bool PCMCacheManager::add(const uint8_t *data, int64_t size, PcmFormatInfo info)
             if(tmp_pcm_data!=nullptr){
                 free(tmp_pcm_data);
                 tmp_pcm_data = nullptr;
+                tmp_pcm_size = 0;
             }
             tmp_pcm_data = (uint8_t* )malloc(sizeof(uint8_t) * size);
             tmp_pcm_maxsize = size;
@@ -152,27 +165,39 @@ bool PCMCacheManager::add(const uint8_t *data, int64_t size, PcmFormatInfo info)
 
 void PCMCacheManager::get(const std::function<void(const uint8_t*, int64_t, PcmFormatInfo)> &databack)
 {
-    // LOG(INFO) << "get";
-    /* code */
-    std::unique_lock<std::mutex> lock(mutex_);
     if (!_pcmQueue.empty())
     {
 
         if (_pcmQueue.front()->data_ptr == nullptr)
         { // 尾部无效数据
+            reada_pos += _pcmQueue.front()->size;
+            if(reada_pos >= _mem.size()){
+                reada_pos = 0;
+            }
+            audio_pcm_total_size -= _pcmQueue.front()->size;
+            // LOG(WARNING) << " pop 0 audio_pcm_total_size: "<<audio_pcm_total_size;
+            // LOG(INFO) << "reada_pos:" << reada_pos << "  write_pos:" << write_pos << "   _mem:"<<_mem.size();
             _pcmQueue.pop();
-            reada_pos = 0;
         }
         if (!_pcmQueue.empty())
         {
             std::unique_ptr<AudioDataObj> dataObj = std::move(_pcmQueue.front());
             _pcmQueue.pop();
-
-            // 音频播放
-
-            // 播放完后 返回内存
+            // 取走数据后 返回内存
             reada_pos += dataObj->size;
-            // LOG(INFO) << "reada_pos:" << reada_pos;
+            audio_pcm_total_size -= dataObj->size;
+            // LOG(WARNING) << " pop 1 audio_pcm_total_size: "<<audio_pcm_total_size  ;
+            // LOG(WARNING) << " _mem.size: "<<_mem.size();
+            // LOG(WARNING) << " _pcmQueue.size: "<<_pcmQueue.size();
+            
+            // int64_t free_space = getFreeSpace();
+            // LOG(WARNING) << " free_space.size: "<<free_space;
+            // LOG(WARNING) << " ";
+            if(reada_pos >= _mem.size()){
+                reada_pos = 0;
+            }
+            // LOG(INFO) << "reada_pos:" << reada_pos << "  write_pos:" << write_pos << "   _mem:"<<_mem.size();
+
             // int sample_rate, int nChannels,  int bitsPerSample          
             
             if (pcm_data_maxsize < dataObj->size)
@@ -190,6 +215,7 @@ void PCMCacheManager::get(const std::function<void(const uint8_t*, int64_t, PcmF
             if (data_dst != nullptr && dataObj->data_ptr != nullptr)
             {
                 memcpy(data_dst, dataObj->data_ptr, dataObj->size);
+                // LOG(INFO) <<" get idx:" <<dataObj->idx << "  dataObj->info time_sec:"<< dataObj->info.time_sec;
                 databack(pcm_data, dataObj->size, dataObj->info);
             }
             else
@@ -197,5 +223,7 @@ void PCMCacheManager::get(const std::function<void(const uint8_t*, int64_t, PcmF
                 LOG(ERROR) << "Either pcm_data or frame->data[0] is null..............................";  
             }
         }
+    }else{
+        LOG(WARNING) << " _pcmQueue.empty: "<< _pcmQueue.size();
     }
 }

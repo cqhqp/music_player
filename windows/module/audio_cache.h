@@ -34,6 +34,8 @@ public:
     // int64_t end;
     uint8_t *data_ptr = nullptr;
     int64_t size;
+    int64_t start_post = 0;
+    int idx;
     PcmFormatInfo info;
 };
 
@@ -66,6 +68,10 @@ private:
     int tmp_pcm_size = 0; //  
     int tmp_pcm_maxsize = 0; // 
     PcmFormatInfo tmp_info;
+
+    int obj_idx = 0;
+
+    int64_t audio_pcm_total_size = 0;
 
     int64_t getFreeSpace() const;
 

@@ -56,6 +56,7 @@ private:
     std::function<void(double, double)> playProcessCallBack;
     std::mutex taskMutex;
     std::mutex taskOutMutex;    // 播放锁
+    std::mutex cacheMutex;    // 缓存锁
     std::condition_variable condition;
     std::condition_variable _out_condition;  // 播放条件变量
     std::future<void> _thread;
@@ -68,6 +69,9 @@ private:
     PcmFormatInfo speakerInfo;
     double start_pcm_sec = 0.0; 
     double new_pcm_sec = 0.0; 
+    double debug_pre_pcm_sec = 0.0; 
+    // 
+    // std::unique_ptr<std::ofstream> debug_outfile; // 调试输出pcm
     std::atomic<bool> out_pause;
     std::atomic<bool> out_stop;
 

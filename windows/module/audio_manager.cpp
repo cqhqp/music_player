@@ -111,7 +111,11 @@ void AudioManager::play()
             // std::unique_ptr<AudioDataObj> data = std::make_unique<AudioDataObj>(std::move(data_ptr), planar, channels);
             // LOG(INFO) << "lambda set_pcm_back  .. add ";
             
-            bool ret = PCMCacheManager::getInstance().add(data, size, info);
+            bool ret = false;
+            {
+                std::lock_guard<std::mutex> lock(cacheMutex);
+                ret = PCMCacheManager::getInstance().add(data, size, info);
+            }
             if(ret){
                 // 如果缓冲区满了。等待（有空闲再处理） 缓冲区 
                 // LOG(INFO) << "output() ";
@@ -327,7 +331,10 @@ void AudioManager::loop()
                     taskMsgQueue.pop();
                 }
             }
-            PCMCacheManager::getInstance().clear(); // 音频停止，要清空 数据缓冲区
+            {
+                std::lock_guard<std::mutex> lock(cacheMutex);
+                PCMCacheManager::getInstance().clear(); // 音频停止，要清空 数据缓冲区
+            }
             this->callback(AUDIO_STATA_STOPED);
         }
         else if (msgObj->obj_msg == AUDIO_CTL_PLAY)
@@ -355,7 +362,12 @@ void AudioManager::loop()
         else if (msgObj->obj_msg == AUDIO_CTL_DECODE)
         {
             // LOG(INFO) << "AUDIO_CTL_DECODE";
-            bool busy = PCMCacheManager::getInstance().isBusy(); // 缓冲区不够的时候
+            bool busy = false;            
+            {
+                std::lock_guard<std::mutex> lock(cacheMutex);
+                busy = PCMCacheManager::getInstance().isBusy(); // 缓冲区不够的时候
+            }
+
             if (busy)
             {
                 busy_wait_output = true;
@@ -388,8 +400,12 @@ void AudioManager::loop()
                     else
                     {
                         LOG(INFO) << "AUDIO_CTL_DECODE ret:" << ret;
-                        this->callback(AUDIO_STATA_STOPED);
-                        PCMCacheManager::getInstance().clear(); // 音频解码异常停止，要清空 数据缓冲区
+                        break;
+                        // this->callback(AUDIO_STATA_STOPED);
+                        // {
+                        //     std::lock_guard<std::mutex> lock(cacheMutex);
+                        //     PCMCacheManager::getInstance().clear(); // 音频解码异常停止，要清空 数据缓冲区
+                        // }
                     }
                 }
                 else
@@ -411,7 +427,6 @@ void AudioManager::loop()
                         taskMsgQueue.pop();
                     }
                 }
-                // PCMCacheManager::getInstance().clear(); // 音频暂停， 缓冲区不能清空
                 this->callback(AUDIO_STATA_PAUSED);
             }
         }
@@ -438,7 +453,10 @@ void AudioManager::loop()
                         taskMsgQueue.pop();
                     }
                 }
-                PCMCacheManager::getInstance().clear(); // 音频SEEK，要清空 数据缓冲区
+                {
+                    std::lock_guard<std::mutex> lock(cacheMutex);
+                    PCMCacheManager::getInstance().clear(); // 音频SEEK，要清空 数据缓冲区
+                }
 
                 std::unique_ptr<AudioVariant> obj = std::move(msgObj->obj_variant);
                 if (auto valuePtr = std::get_if<std::unique_ptr<double>>(obj.get()))
@@ -523,6 +541,11 @@ void AudioManager::loop_out()
                 newplay = true;
                 start_pcm_sec = 0;
                 std::cout << "Found std::unique_ptr<IAudioOutput>!" << std::endl;
+                // debug_outfile = std::make_unique<std::ofstream>("magr_data.pcm", std::ios::binary);
+                // if (!debug_outfile->is_open())
+                // { // 检查文件是否成功打开
+                //     std::cerr << "Unable to open file for writing >>> debug_outfile";
+                // }
             }
             else
             {
@@ -552,7 +575,7 @@ void AudioManager::loop_out()
                     {
                         duration_sec = new_pcm_sec - start_pcm_sec;
                     }
-                    if ((duration_sec - duration_clock) < 0.5523)
+                    if ((duration_sec - duration_clock) < 0.026125*4)
                     {
                         // LOG(INFO) << "duration_clock:" << duration_clock;
                         // LOG(INFO) << "duration_sec:" << duration_sec << "   new_pcm_sec("<< new_pcm_sec<<")" << " - start_pcm_sec("<< start_pcm_sec <<")";
@@ -564,27 +587,34 @@ void AudioManager::loop_out()
                 if (can_speaker)
                 {
                     // 从缓存中取出一段音频数据
-                    PCMCacheManager::getInstance().get([&](const uint8_t *data, int64_t size, PcmFormatInfo info)
-                                                       {
-                            if(newplay){
-                                if(!output_->isInit())
-                                    output_->init(info);
-                                
-                                start_clock = std::chrono::high_resolution_clock::now();  
-                                LOG(INFO) << "start_clock ........ ";
-                                newplay = false;
-                                start_pcm_sec = 0;
+                    {
+                        std::lock_guard<std::mutex> lock(cacheMutex);
+                        PCMCacheManager::getInstance().get([&](const uint8_t *data, int64_t size, PcmFormatInfo info)
+                                                        {
+                                if(newplay){
+                                    if(!output_->isInit())
+                                        output_->init(info);
+                                    
+                                    start_clock = std::chrono::high_resolution_clock::now();  
+                                    LOG(INFO) << "start_clock ........ ";
+                                    newplay = false;
+                                    start_pcm_sec = 0;
 
-                                // 判断是否需要进行播放，如果没有到播放时间，暂时不播放
-                                output_->play(); 
-                            }
-                            if(start_pcm_sec == 0){
-                                start_pcm_sec = info.time_sec;
-                                LOG(INFO) << "start_pcm_sec:" << start_pcm_sec;
-                            }
-                            output_->add_pcm(data, size, info);
-                            new_pcm_sec = info.time_sec;
-                            this->playProcessCallBack(info.max_time_sec, new_pcm_sec); });
+                                    // 判断是否需要进行播放，如果没有到播放时间，暂时不播放
+                                    output_->play(); 
+                                }
+                                if(start_pcm_sec == 0){
+                                    start_pcm_sec = info.time_sec;
+                                    LOG(INFO) << "start_pcm_sec:" << start_pcm_sec;
+                                }
+                                // debug_outfile->write((const char*)data, size);
+                                output_->add_pcm(data, size, info);
+                                new_pcm_sec = info.time_sec;
+                                LOG(INFO) << "kkkkkk:" << new_pcm_sec- debug_pre_pcm_sec;
+                                debug_pre_pcm_sec = new_pcm_sec;
+                                
+                                this->playProcessCallBack(info.max_time_sec, new_pcm_sec); });
+                    }
                 }
                 else
                 {

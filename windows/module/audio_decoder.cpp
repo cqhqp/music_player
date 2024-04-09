@@ -290,14 +290,12 @@ bool Mp3Decoder::decode()
                                     if (!dst_data)
                                     {
                                         // 根据src_nb_samples*dst_rate/src_rate公式初步估算重采样后音频的nb_samples大小
-                                        
-                                        LOG(INFO) << " xxx";
                                         max_dst_nb_samples = dst_nb_samples =
                                             av_rescale_rnd(src_nb_samples, dst_rate, src_rate, AV_ROUND_UP);
                                         ret = av_samples_alloc_array_and_samples(&dst_data , &dst_linesize, dst_channels,
                                                                                  dst_nb_samples, dst_sample_fmt, 0);
 
-                                        LOG(INFO) << " 将 dst_data 指针和linesize复制到frame的相应字段";
+                                        // LOG(INFO) << " 将 dst_data 指针和linesize复制到frame的相应字段";
                                         // 将 dst_data 指针和linesize复制到frame的相应字段  
                                         for (int i = 0; i < dst_channels; i++) {  
                                             output_frame->data[i] = dst_data[i];  
