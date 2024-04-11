@@ -8,7 +8,7 @@
 class PcmFormatInfo
 {
 public:
-    int nb_samples = 0; // 采样数
+    int nb_samples = 0; //  样本数
     int channels = 0;   // 通道
     int sample_rate =0; // 采样率
     bool is_float = false;  // u8 int float

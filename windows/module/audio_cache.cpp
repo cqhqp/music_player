@@ -9,7 +9,7 @@ PCMCacheManager PCMCacheManager::Singleton::instance; // 静态成员 instance �
 PCMCacheManager::PCMCacheManager()
 {
     // _mem = std::vector<uint8_t>(1024 * 1024 * 1);
-    _mem = std::vector<uint8_t>(128 * 1024 * 1);
+    _mem = std::vector<uint8_t>(256 * 1024 * 1);
     reada_pos = write_pos = 0;
     obj_idx = 0;
 };
@@ -35,7 +35,7 @@ bool PCMCacheManager::isBusy()
     }
     int free_space = getFreeSpace();
     if(tmp_pcm_size != 0 && free_space > _mem.size()/2){ 
-        LOG(INFO) << " isBusy ..... free_space:" << free_space;
+        // LOG(INFO) << " isBusy ..... free_space:" << free_space;
         
         // 如果有临时数据，等待缓存空间释放出1半的时候，在存储，减少处理次数
         add(tmp_pcm_data, tmp_pcm_size, tmp_info);
@@ -136,9 +136,9 @@ bool PCMCacheManager::add(const uint8_t *data, int64_t size, PcmFormatInfo info)
     else
     {
         // 空间不够，需要把临时数据保存下来
-        LOG(WARNING) << " no spase";
-        LOG(WARNING) << " _pcmQueue size:" << _pcmQueue.size();
-        LOG(WARNING) << " _pcmQueue time_sec:" << info.time_sec - _pcmQueue.front()->info.time_sec;
+        // LOG(WARNING) << " no spase";
+        // LOG(WARNING) << " _pcmQueue size:" << _pcmQueue.size();
+        // LOG(WARNING) << " _pcmQueue time_sec:" << info.time_sec - _pcmQueue.front()->info.time_sec;
 
         if (tmp_pcm_maxsize < size)
         {                                

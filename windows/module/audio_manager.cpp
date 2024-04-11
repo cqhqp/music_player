@@ -93,8 +93,12 @@ void AudioManager::play()
     output_->getDefaultFormat([&](PcmFormatInfo info)
                               {
         speakerInfo = info; 
-        
-        decoder_->setSpeakerInfo(speakerInfo); });
+        output_->init(info, [&](PcmFormatInfo info){
+            speakerInfo = info;
+            decoder_->setSpeakerInfo(speakerInfo);
+        });
+
+        });
 
     {
         std::unique_ptr<AudioVariant> audioVariant = std::make_unique<AudioVariant>(std::move(output_));
@@ -591,17 +595,14 @@ void AudioManager::loop_out()
                         std::lock_guard<std::mutex> lock(cacheMutex);
                         PCMCacheManager::getInstance().get([&](const uint8_t *data, int64_t size, PcmFormatInfo info)
                                                         {
-                                if(newplay){
-                                    if(!output_->isInit())
-                                        output_->init(info);
-                                    
+                                if(newplay){                                    
                                     start_clock = std::chrono::high_resolution_clock::now();  
                                     LOG(INFO) << "start_clock ........ ";
                                     newplay = false;
                                     start_pcm_sec = 0;
 
                                     // 判断是否需要进行播放，如果没有到播放时间，暂时不播放
-                                    output_->play(); 
+                                    //output_->play(); 
                                 }
                                 if(start_pcm_sec == 0){
                                     start_pcm_sec = info.time_sec;
@@ -610,7 +611,7 @@ void AudioManager::loop_out()
                                 // debug_outfile->write((const char*)data, size);
                                 output_->add_pcm(data, size, info);
                                 new_pcm_sec = info.time_sec;
-                                LOG(INFO) << "kkkkkk:" << new_pcm_sec- debug_pre_pcm_sec;
+                                // LOG(INFO) << "kkkkkk:" << new_pcm_sec- debug_pre_pcm_sec;
                                 debug_pre_pcm_sec = new_pcm_sec;
                                 
                                 this->playProcessCallBack(info.max_time_sec, new_pcm_sec); });
